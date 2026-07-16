@@ -27,6 +27,8 @@ class State:
     paused: bool = False
     # Conversation IDs from Cursor stop hooks that still need a user reply.
     awaiting_reply: list[str] = field(default_factory=list)
+    # Last activity (unix time) per awaiting conversation_id.
+    awaiting_activity: dict[str, float] = field(default_factory=dict)
     # Peak reply-effort score (0..1) across submits during this interrupt.
     peak_effort: float = 0.0
     # When True, resume from interrupt goes straight to armed (no cool-down).
@@ -51,6 +53,23 @@ class State:
         if not isinstance(awaiting, list):
             awaiting = []
         awaiting_ids = [str(x) for x in awaiting if x is not None and str(x)]
+        awaiting_ids = _unique_preserve(awaiting_ids)
+
+        activity_raw = data.get("awaiting_activity", {})
+        activity: dict[str, float] = {}
+        if isinstance(activity_raw, dict):
+            for key, val in activity_raw.items():
+                try:
+                    activity[str(key)] = float(val)
+                except (TypeError, ValueError):
+                    continue
+        # Backfill missing timestamps so old state files still prune eventually.
+        now = time.time()
+        for cid in awaiting_ids:
+            if cid not in activity:
+                activity[cid] = now
+        activity = {k: v for k, v in activity.items() if k in set(awaiting_ids)}
+
         peak = data.get("peak_effort", 0.0)
         try:
             peak_f = float(peak)
@@ -66,7 +85,8 @@ class State:
             resume_watch_pid=_as_optional_int(data.get("resume_watch_pid")),
             cooldown_wait_pid=_as_optional_int(data.get("cooldown_wait_pid")),
             paused=bool(data.get("paused", False)),
-            awaiting_reply=_unique_preserve(awaiting_ids),
+            awaiting_reply=awaiting_ids,
+            awaiting_activity=activity,
             peak_effort=peak_f,
             skip_cooldown=bool(data.get("skip_cooldown", False)),
             permission_gate_active=bool(data.get("permission_gate_active", False)),
@@ -121,11 +141,18 @@ def _unique_preserve(items: list[str]) -> list[str]:
     return out
 
 
-def note_awaiting(state: State, conversation_id: str | None) -> None:
+def note_awaiting(
+    state: State,
+    conversation_id: str | None,
+    *,
+    now: float | None = None,
+) -> None:
     if not conversation_id:
         return
+    ts = time.time() if now is None else now
     if conversation_id not in state.awaiting_reply:
         state.awaiting_reply.append(conversation_id)
+    state.awaiting_activity[conversation_id] = ts
 
 
 def clear_awaiting(state: State, conversation_id: str | None) -> bool:
@@ -135,7 +162,45 @@ def clear_awaiting(state: State, conversation_id: str | None) -> bool:
     if conversation_id not in state.awaiting_reply:
         return False
     state.awaiting_reply = [c for c in state.awaiting_reply if c != conversation_id]
+    state.awaiting_activity.pop(conversation_id, None)
     return True
+
+
+def clear_all_awaiting(state: State) -> list[str]:
+    """Clear every awaiting conversation. Returns the ids that were cleared."""
+    cleared = list(state.awaiting_reply)
+    state.awaiting_reply = []
+    state.awaiting_activity = {}
+    return cleared
+
+
+def prune_stale_awaiting(
+    state: State,
+    *,
+    ttl_seconds: int,
+    now: float | None = None,
+) -> list[str]:
+    """Drop awaiting chats with no activity within ttl_seconds. Returns dropped ids."""
+    if ttl_seconds <= 0:
+        return []
+    ts = time.time() if now is None else now
+    keep: list[str] = []
+    dropped: list[str] = []
+    for cid in state.awaiting_reply:
+        last = state.awaiting_activity.get(cid, ts)
+        if ts - last >= ttl_seconds:
+            dropped.append(cid)
+        else:
+            keep.append(cid)
+    if not dropped:
+        return []
+    state.awaiting_reply = keep
+    state.awaiting_activity = {
+        cid: state.awaiting_activity[cid]
+        for cid in keep
+        if cid in state.awaiting_activity
+    }
+    return dropped
 
 
 def default_state() -> State:

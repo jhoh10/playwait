@@ -12,7 +12,16 @@ from playwait.actions import Desktop
 from playwait.config import Config
 from playwait.effort import cooldown_seconds_for_effort, score_effort
 from playwait.permission import shell_needs_permission_interrupt
-from playwait.state import Mode, State, clear_awaiting, load_state, note_awaiting, save_state
+from playwait.state import (
+    Mode,
+    State,
+    clear_all_awaiting,
+    clear_awaiting,
+    load_state,
+    note_awaiting,
+    prune_stale_awaiting,
+    save_state,
+)
 
 log = logging.getLogger("playwait")
 
@@ -142,6 +151,7 @@ def arm(desktop: Desktop, config: Config, state: State) -> State:
     state.resume_watch_pid = None
     state.cooldown_wait_pid = None
     state.awaiting_reply = []
+    state.awaiting_activity = {}
     state.peak_effort = 0.0
     state.skip_cooldown = False
     state.permission_gate_active = False
@@ -175,10 +185,15 @@ def handle_stop(
         )
         return state
 
-    note_awaiting(state, cid)
+    note_awaiting(state, cid, now=now)
     # Turn-end always wants effort cool-down on eventual return, even if a
     # permission gate had set skip_cooldown while already interrupted.
     state.skip_cooldown = False
+    dropped = prune_stale_awaiting(
+        state, ttl_seconds=config.awaiting_ttl_seconds, now=now
+    )
+    if dropped:
+        log.info("stop: pruned stale awaiting %s", dropped)
     log.info(
         "stop: conversation=%s mode=%s awaiting=%s",
         cid,
@@ -242,6 +257,10 @@ def handle_submit(
         effort = 0.0
 
     cleared = clear_awaiting(state, cid)
+    # Touch activity for any remaining chats is not needed; prune abandoned ones.
+    dropped = prune_stale_awaiting(state, ttl_seconds=config.awaiting_ttl_seconds)
+    if dropped:
+        log.info("submit: pruned stale awaiting %s", dropped)
     log.info(
         "submit: conversation=%s cleared=%s mode=%s effort=%.2f peak=%.2f "
         "awaiting_before=%s awaiting_after=%s",
@@ -371,6 +390,9 @@ def handle_permission_done(
     """
     if state.mode == Mode.IDLE or not state.window_id:
         return state
+    dropped = prune_stale_awaiting(state, ttl_seconds=config.awaiting_ttl_seconds)
+    if dropped:
+        log.info("permission-done: pruned stale awaiting %s", dropped)
     if not state.permission_gate_active:
         log.info("permission-done: ignore (no active permission gate)")
         return state
@@ -391,6 +413,47 @@ def handle_permission_done(
     state.permission_gate_active = False
     state.skip_cooldown = True
     return return_to_game(desktop, config, state)
+
+
+def release(
+    desktop: Desktop,
+    config: Config,
+    state: State,
+) -> State:
+    """Clear awaiting chats and return to the game if interrupted.
+
+    Use when you're done in Cursor but won't send another message in a waiting chat.
+    """
+    if state.mode == Mode.IDLE or not state.window_id:
+        log.info("release: ignored (disarmed)")
+        return state
+
+    cleared = clear_all_awaiting(state)
+    state.pending = False
+    state.permission_gate_active = False
+    log.info("release: cleared awaiting %s mode=%s", cleared, state.mode.value)
+
+    if state.mode == Mode.INTERRUPTED:
+        quiet_confirm(desktop, config, "playwait", "Released — back to game")
+        return return_to_game(desktop, config, state)
+
+    if state.mode == Mode.COOLDOWN:
+        # Stop waiting out cool-down bookkeeping for old chats; keep playing.
+        quiet_confirm(
+            desktop,
+            config,
+            "playwait",
+            f"Released {len(cleared)} waiting chat(s)",
+        )
+        return state
+
+    quiet_confirm(
+        desktop,
+        config,
+        "playwait",
+        f"Released {len(cleared)} waiting chat(s)",
+    )
+    return state
 
 
 def return_to_game(desktop: Desktop, config: Config, state: State) -> State:

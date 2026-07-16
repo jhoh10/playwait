@@ -17,6 +17,7 @@ from playwait.service import (
     handle_submit,
     load,
     persist,
+    release,
     setup_logging,
 )
 from playwait.state import Mode
@@ -48,6 +49,10 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("arm", help="Arm the currently focused window")
     sub.add_parser("disarm", help="Clear arm state")
+    sub.add_parser(
+        "release",
+        help="Clear waiting chats and return to game if interrupted",
+    )
     sub.add_parser("status", help="Print current state as JSON")
     sub.add_parser("on-stop", help="Cursor stop hook (reads JSON on stdin)")
     sub.add_parser(
@@ -83,6 +88,11 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "disarm":
         state = disarm(desktop, config, load(config))
+        persist(config, state)
+        return 0
+
+    if args.cmd == "release":
+        state = release(desktop, config, load(config))
         persist(config, state)
         return 0
 

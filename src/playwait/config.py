@@ -41,6 +41,8 @@ class Config:
     desktop_notifications: bool = True
     # Leave the game during cool-down this long → abandon cool-down (seconds).
     cooldown_abandon_seconds: float = 1.0
+    # Drop awaiting chats with no stop/submit activity for this long (seconds).
+    awaiting_ttl_seconds: int = 900  # 15 minutes
     # Tool-permission auto-interrupt (bypasses cool-down; resume skips cool-down).
     mcp_permission_interrupt: bool = True
     # off | patterns | ask-always
@@ -146,4 +148,6 @@ def load_config(path: Path | None = None) -> Config:
         cfg.shell_permission_patterns = [
             str(p) for p in data["shell_permission_patterns"] if str(p).strip()
         ]
+    if "awaiting_ttl_seconds" in data and isinstance(data["awaiting_ttl_seconds"], int):
+        cfg.awaiting_ttl_seconds = max(0, data["awaiting_ttl_seconds"])
     return cfg

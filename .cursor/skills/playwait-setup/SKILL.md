@@ -40,7 +40,8 @@ playwait setup:
 - [ ] Checkout + venv install
 - [ ] apt deps (xdotool, wmctrl, libnotify-bin)
 - [ ] Cursor hooks.json wired (stop, submit, MCP, shell)
-- [ ] GNOME arm/disarm shortcuts
+- [ ] Timing config (cool-down range + awaiting TTL)
+- [ ] GNOME arm/disarm/release shortcuts
 - [ ] Dry-run on-stop / on-submit / on-permission
 ```
 
@@ -84,7 +85,7 @@ cd "$ROOT"
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e '.[dev]'
-chmod +x hooks/on-stop.sh hooks/on-submit.sh
+chmod +x hooks/on-stop.sh hooks/on-submit.sh hooks/on-permission-*.sh
 ```
 
 Confirm:
@@ -146,32 +147,75 @@ If Cursor is already open, tell them hooks may need a **Cursor restart** (or new
 
 ---
 
-## Step 5 — GNOME arm / disarm shortcuts
+## Step 5 — Timing preferences (write config)
+
+Ask **one question at a time**, then write `~/.config/playwait/config.toml` (create parent dirs). Keep other keys only if already present.
+
+### 5a — Cool-down range after return-to-game
+
+Ask which preset they want (default / recommend **Play**):
+
+1. **Play** — 30s–180s (default; better when gaming between replies)
+2. **Short (iteration)** — 15s–60s (faster testing while developing)
+3. **Custom** — ask for min and max seconds
+
+Map to:
+
+```toml
+cooldown_min_seconds = <min>
+cooldown_max_seconds = <max>
+cooldown_seconds = <min>
+```
+
+### 5b — Multi-chat waiting TTL
+
+Explain briefly: playwait stays in Cursor until waiting chats are answered; abandoned chats auto-drop after a TTL; `playwait release` clears immediately and returns if interrupted.
+
+Ask:
+
+1. **15 minutes** (default, recommended)
+2. **10 minutes**
+3. **30 minutes**
+4. **Custom** seconds (or `0` to disable TTL)
+
+Map to:
+
+```toml
+awaiting_ttl_seconds = <seconds>
+```
+
+After writing, show the two chosen values in one short confirmation line.
+
+---
+
+## Step 6 — GNOME arm / disarm / release shortcuts
 
 Ask whether they want hotkeys now or later.
 
 If yes:
 
-1. Resolve absolute arm/disarm commands (expand `$HOME`; GNOME often won’t):
+1. Resolve absolute commands (expand `$HOME`; GNOME often won’t):
 
    ```bash
    echo "$PW arm"
    echo "$PW disarm"
+   echo "$PW release"
    ```
 
 2. Give **only** this hand-done UI recipe (don’t paste the whole README):
 
    - Settings → Keyboard → View and Customize Shortcuts → Custom Shortcuts
-   - Add **playwait arm** → command from step 1 → suggest **Super+Alt+A**
+   - Add **playwait arm** → suggest **Super+Alt+A**
    - Add **playwait disarm** → suggest **Super+Alt+D**
+   - Add **playwait release** → suggest **Super+Alt+R** (clear waiting chats / return)
 
-3. Ask them to confirm once both exist (or that they skipped).
+3. Ask them to confirm once they exist (or that they skipped).
 
 Do not try to drive the GNOME Settings GUI unless they explicitly want automation and a reliable method is available.
 
 ---
 
-## Step 6 — Dry-run proof
+## Step 7 — Dry-run proof
 
 While **disarmed** (`"$PW" status` should show `"mode": "idle"` or no armed window):
 
@@ -192,14 +236,15 @@ If submit never appears in the log later during real use, the usual bug is a wro
 
 ---
 
-## Step 7 — First real use (brief)
+## Step 8 — First real use (brief)
 
 Tell them only this:
 
 1. Focus the game / other task window → run arm (hotkey or `"$PW" arm`).
 2. Check `"$PW" status` → `"mode": "armed"`, non-null `window_id`.
 3. Prefer borderless/windowed over exclusive fullscreen.
-4. When done: disarm.
+4. Done in Cursor but won’t reply? `"$PW" release`.
+5. When done for the night: disarm.
 
 Optional debug: `tail -f ~/.local/state/playwait/playwait.log`
 
@@ -211,9 +256,9 @@ Optional debug: `tail -f ~/.local/state/playwait/playwait.log`
 |--------|----------------|
 | Agent ends, game never pauses | `stop` hook path wrong / not executable / not X11 |
 | Reply sent, never returns | `beforeSubmitPrompt` missing or wrong path |
-| Stuck “still awaiting” | Extra `conversation_id` in state; check `playwait status` + log |
+| Stuck “still awaiting” | Extra `conversation_id` in state; `playwait release` or wait for TTL; check log |
 | Arm grabs wrong window | Focus the target window first, then arm |
 
 ## Out of scope for this skill
 
-Wayland, SIGSTOP pause, publishing releases, changing cool-down heuristics, tuning shell permission regexes (point at README/`config.toml`).
+Wayland, SIGSTOP pause, publishing releases, tuning shell permission regexes (point at README/`config.toml`).

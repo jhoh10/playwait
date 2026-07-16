@@ -17,9 +17,10 @@ from playwait.state import Mode, State
 def _cfg(tmp_path: Path) -> Config:
     return Config(
         state_dir=tmp_path,
-        cooldown_seconds=30,
-        cooldown_min_seconds=30,
-        cooldown_max_seconds=180,
+        cooldown_seconds=15,
+        cooldown_min_seconds=15,
+        cooldown_max_seconds=60,
+        awaiting_ttl_seconds=900,
         interrupt_lead_seconds=0.0,
         interrupt_step_seconds=0.0,
         return_lead_seconds=0.0,
@@ -144,7 +145,7 @@ def test_submit_last_chat_returns_to_game(tmp_path: Path, monkeypatch) -> None:
     assert state.awaiting_reply == []
     assert state.mode == Mode.COOLDOWN
     assert state.paused is False
-    assert state.cooldown_until == 10_000.0 + 30  # low-effort → min cool-down
+    assert state.cooldown_until == 10_000.0 + 15  # low-effort → min cool-down
     assert desktop.activated[0] == "0xgame"
     assert ("0xgame", "Escape") in desktop.keys_sent
     assert 111 in killed
@@ -177,7 +178,7 @@ def test_submit_high_effort_longer_cooldown(tmp_path: Path, monkeypatch) -> None
     assert state.mode == Mode.COOLDOWN
     assert state.cooldown_until is not None
     duration = state.cooldown_until - 50_000.0
-    assert duration >= 90
+    assert duration >= 40
 
 
 def test_stop_during_cooldown_sets_pending(tmp_path: Path) -> None:
@@ -392,7 +393,7 @@ def test_resume_starts_cooldown(tmp_path: Path, monkeypatch) -> None:
     state = on_resume_focus(desktop, _cfg(tmp_path), state)
     assert state.mode == Mode.COOLDOWN
     assert state.paused is False
-    assert state.cooldown_until == 5_000.0 + 30
+    assert state.cooldown_until == 5_000.0 + 15
     assert state.cooldown_wait_pid == 888
     assert desktop.keys_sent == [("0xgame", "Escape")]
 

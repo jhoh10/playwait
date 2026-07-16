@@ -43,8 +43,14 @@ For a guided setup in Cursor, run the **playwait-setup** skill (see `.cursor/ski
 
    Confirm with `playwait status` — you want `"mode": "armed"` and a non-null `"window_id"`.
 3. When an agent finishes: soft chime → pause → minimize → Cursor. Extra finished chats while you’re already interrupted stay tracked; you are not yanked again. Mid-run **tool approvals** (MCP always; Shell when the command matches risk patterns) also yank immediately — they **bypass** cool-down, and after you Allow (tool finishes) playwait **returns you to the game** with no cool-down timer.
-4. Reply in Cursor. After each send, if other chats still need you, you stay in Cursor. When the **last** waiting chat is answered, playwait returns you to the window and starts a cool-down that scales with how much thought your replies took (**30s–3 min**, local heuristics — short “yes” → short cool-down; longer/code-heavy replies → longer). If you leave the game for Cursor during cool-down, cool-down is abandoned (and a deferred agent-ready interrupt, if any, soft-fires without stealing focus back through the game).
-5. When done for the night:
+4. Reply in Cursor. After each send, if other chats still need you, you stay in Cursor. When the **last fresh** waiting chat is answered, playwait returns you to the window and starts a cool-down that scales with reply effort (**30s–3 min** by default). Waiting chats with **no activity for 15 minutes** are dropped automatically. If you leave the game for Cursor during cool-down, cool-down is abandoned (and a deferred agent-ready interrupt, if any, soft-fires without stealing focus back through the game).
+5. Done with Cursor but won’t reply to a waiting chat? Clear and return:
+
+   ```bash
+   "$HOME/src/playwait/.venv/bin/playwait" release
+   ```
+
+6. When done for the night:
 
    ```bash
    "$HOME/src/playwait/.venv/bin/playwait" disarm
@@ -121,8 +127,9 @@ PLAYWAIT_PERMISSION_SOURCE=shell echo '{"command":"sudo true"}' | playwait on-pe
 |------|---------|
 | playwait arm | `$HOME/src/playwait/.venv/bin/playwait arm` |
 | playwait disarm | `$HOME/src/playwait/.venv/bin/playwait disarm` |
+| playwait release | `$HOME/src/playwait/.venv/bin/playwait release` |
 
-GNOME may not expand `$HOME` in shortcuts — paste the expanded absolute path instead. Suggested chords: **Super+Alt+A** (arm), **Super+Alt+D** (disarm).
+GNOME may not expand `$HOME` in shortcuts — paste the expanded absolute path instead. Suggested chords: **Super+Alt+A** (arm), **Super+Alt+D** (disarm), **Super+Alt+R** (release).
 
 ## Config (optional)
 
@@ -136,6 +143,12 @@ cooldown_min_seconds = 30
 cooldown_max_seconds = 180
 # Fallback when you focus the window manually (no scored reply):
 cooldown_seconds = 30
+# Drop waiting chats with no stop/submit activity this long (seconds):
+awaiting_ttl_seconds = 900   # 15 minutes
+# For faster iteration while developing, you can temporarily use:
+# cooldown_min_seconds = 15
+# cooldown_max_seconds = 60
+# cooldown_seconds = 15
 # Leave game during cool-down for this long → abandon cool-down:
 # cooldown_abandon_seconds = 1.0
 # Tool-permission auto-interrupt:
