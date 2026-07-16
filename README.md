@@ -1,21 +1,17 @@
 # playwait
 
-Personal Linux helper: while you focus on a game (or another fullscreen task), **Cursor agents** can run in the background. When an agent turn finishes, playwait pauses the focused window, minimizes it, focuses Cursor, and plays a soft chime. After you answer **every** chat that was waiting, it sends you back. A short cool-down then avoids frantic back-and-forth.
+While you focus on a game (or another fullscreen task), **Cursor agents** run in the background. When a turn finishes (or a tool needs approval), playwait pauses the window, focuses Cursor, and chimes. After you answer every waiting chat, it sends you back.
 
-**Supported environment (0.1.x):** Ubuntu 24.04, GNOME on **X11** (not Wayland). Esc-based pause (not process freeze).
+**Supported:** Ubuntu 24.04, GNOME on **X11** (not Wayland). Esc pause (not process freeze).
 
-## Requirements
+## Quick start (recommended)
+
+### 1. Clone and install
 
 ```bash
 sudo apt install xdotool wmctrl libnotify-bin
 # Sound: pw-play (PipeWire) or paplay
-```
 
-Python 3.12+.
-
-## Install
-
-```bash
 git clone https://github.com/jhoh10/playwait.git ~/src/playwait
 cd ~/src/playwait
 python3 -m venv .venv
@@ -24,18 +20,22 @@ pip install -e '.[dev]'
 chmod +x hooks/on-stop.sh hooks/on-submit.sh hooks/on-permission-*.sh
 ```
 
-Use the venv binary by absolute path in shortcuts and hooks (GNOME/Cursor often lack your shell `PATH`):
+Python 3.12+.
 
-```bash
-echo "$HOME/src/playwait/.venv/bin/playwait"
-```
+### 2. Run the setup skill in Cursor
 
-For a guided setup in Cursor, run the **playwait-setup** skill (see `.cursor/skills/playwait-setup/`).
+Open this repo in Cursor and run the **playwait-setup** skill (`.cursor/skills/playwait-setup/`).
+
+It walks you through hooks, timing preferences (cool-down + awaiting TTL), optional GNOME hotkeys, and a dry-run. Prefer this over hand-editing configs.
+
+Then: focus your game → `playwait arm` (or your hotkey) → play. When done: `playwait disarm`.
+
+---
 
 ## Daily use
 
 1. Prefer **borderless windowed** (or a normal window) over exclusive fullscreen so minimize/focus works reliably.
-2. Focus the game (or other task) window and **arm** it (see hotkeys below):
+2. Focus the game (or other task) window and **arm** it:
 
    ```bash
    "$HOME/src/playwait/.venv/bin/playwait" arm
@@ -58,11 +58,12 @@ For a guided setup in Cursor, run the **playwait-setup** skill (see `.cursor/ski
 
 ```bash
 playwait status   # awaiting_reply lists chats still needing a reply
+echo "$HOME/src/playwait/.venv/bin/playwait"   # absolute path for shortcuts/hooks
 ```
 
-## Cursor hooks
+## Cursor hooks (manual reference)
 
-Create or edit `~/.cursor/hooks.json` with **absolute** paths (adjust if your clone is elsewhere):
+The setup skill writes these for you. If editing by hand, use **absolute** paths in `~/.cursor/hooks.json`:
 
 ```json
 {
@@ -102,7 +103,7 @@ Create or edit `~/.cursor/hooks.json` with **absolute** paths (adjust if your cl
 }
 ```
 
-Replace `/home/YOU/src/playwait` with your real checkout path (e.g. output of `pwd` inside the repo).
+Replace `/home/YOU/src/playwait` with your real checkout path.
 
 - **`stop`** — agent turn ended → interrupt (and remember that chat).
 - **`beforeSubmitPrompt`** — you hit send → clear that chat; return only when none remain.
