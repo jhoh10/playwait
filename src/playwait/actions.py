@@ -9,6 +9,11 @@ from typing import Protocol
 
 log = logging.getLogger("playwait")
 
+# Stable id so successive playwait banners replace each other instead of stacking
+# in GNOME's notification queue (often stuck behind Cursor tool-approval prompts).
+_NOTIFY_REPLACE_ID = "871001"
+_NOTIFY_EXPIRE_MS = "4000"
+
 
 class Desktop(Protocol):
     def active_window_id(self) -> str | None: ...
@@ -19,6 +24,20 @@ class Desktop(Protocol):
     def find_cursor_window(self, name: str, wm_class: str) -> str | None: ...
     def notify(self, title: str, body: str) -> None: ...
     def play_sound(self, path: Path | None, *, wait: bool = False) -> None: ...
+
+
+def notify_argv(title: str, body: str) -> list[str]:
+    """Build notify-send argv: transient, short-lived, single replace slot."""
+    return [
+        "notify-send",
+        "--app-name=playwait",
+        "--urgency=low",
+        "--expire-time=" + _NOTIFY_EXPIRE_MS,
+        "--transient",
+        "--replace-id=" + _NOTIFY_REPLACE_ID,
+        title,
+        body,
+    ]
 
 
 @dataclass
@@ -185,7 +204,7 @@ class X11Desktop:
     def notify(self, title: str, body: str) -> None:
         if not shutil.which("notify-send"):
             return
-        _run(["notify-send", "--app-name=playwait", title, body])
+        _run(notify_argv(title, body))
 
     def play_sound(self, path: Path | None, *, wait: bool = False) -> None:
         if path is None or not path.is_file():

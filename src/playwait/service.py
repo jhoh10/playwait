@@ -17,12 +17,14 @@ log = logging.getLogger("playwait")
 
 
 def quiet_confirm(desktop: Desktop, config: Config, title: str, body: str) -> None:
-    desktop.notify(title, body)
+    if config.desktop_notifications:
+        desktop.notify(title, body)
     desktop.play_sound(config.resolve_sound("confirm"), wait=False)
 
 
 def interrupt_notify(desktop: Desktop, config: Config, body: str) -> None:
-    desktop.notify("playwait", body)
+    if config.desktop_notifications:
+        desktop.notify("playwait", body)
     desktop.play_sound(config.resolve_sound("interrupt"), wait=False)
 
 
@@ -69,7 +71,8 @@ def do_interrupt(desktop: Desktop, config: Config, state: State) -> State:
 def arm(desktop: Desktop, config: Config, state: State) -> State:
     wid = desktop.active_window_id()
     if not wid:
-        desktop.notify("playwait", "Could not read active window")
+        if config.desktop_notifications:
+            desktop.notify("playwait", "Could not read active window")
         return state
     _cancel_watchers(state)
     state.mode = Mode.ARMED
@@ -190,10 +193,11 @@ def handle_submit(
 
     if state.awaiting_reply:
         n = len(state.awaiting_reply)
-        desktop.notify(
-            "playwait",
-            f"{n} chat{'s' if n != 1 else ''} still need a reply — staying in Cursor",
-        )
+        if config.desktop_notifications:
+            desktop.notify(
+                "playwait",
+                f"{n} chat{'s' if n != 1 else ''} still need a reply — staying in Cursor",
+            )
         log.info(
             "submit: staying in Cursor; still awaiting %s",
             state.awaiting_reply,

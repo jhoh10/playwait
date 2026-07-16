@@ -116,6 +116,7 @@ cursor_class = "cursor"
 # interrupt_lead_seconds = 1.0   # chime, then wait before window changes
 # interrupt_step_seconds = 0.4
 # return_lead_seconds = 0.35
+# desktop_notifications = false  # chime-only; avoid GNOME banner queueing
 ```
 
 State and logs: `~/.local/state/playwait/`.
@@ -130,6 +131,18 @@ playwait status   # mode + awaiting_reply snapshot
 
 - Prefer **borderless windowed** over exclusive fullscreen.
 - Pause defaults to **Esc**. Process freeze (`SIGSTOP`) is not in this early release yet.
+
+## Notifications
+
+Playwait uses a **chime** as the primary interrupt signal. Desktop banners are secondary.
+
+On GNOME, Cursor’s tool Allow/Deny prompts are action notifications. While one of those sits unacknowledged, other banners (including playwait’s) often **queue and only appear after you dismiss it**. Trust the chime and `~/.local/state/playwait/playwait.log` when that happens.
+
+Playwait banners are transient and reuse one notification slot so they don’t flood the tray when the queue finally drains. To disable banners entirely (keep sound):
+
+```toml
+desktop_notifications = false
+```
 
 ## Development
 

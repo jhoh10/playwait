@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from playwait.actions import pause_key_argv
+from playwait.actions import notify_argv, pause_key_argv
 from playwait.actions import RecordingDesktop
 from playwait.config import Config
 from pathlib import Path
@@ -14,6 +14,16 @@ def test_pause_key_argv() -> None:
         "12345",
         "Escape",
     ]
+
+
+def test_notify_argv_is_transient_and_replacing() -> None:
+    argv = notify_argv("playwait", "hello")
+    assert argv[0] == "notify-send"
+    assert "--transient" in argv
+    assert "--urgency=low" in argv
+    assert any(a.startswith("--replace-id=") for a in argv)
+    assert any(a.startswith("--expire-time=") for a in argv)
+    assert argv[-2:] == ["playwait", "hello"]
 
 
 def test_recording_desktop_minimize_activate() -> None:

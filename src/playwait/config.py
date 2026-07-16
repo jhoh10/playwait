@@ -36,6 +36,9 @@ class Config:
     return_lead_seconds: float = 0.35
     interrupt_sound: str = ""
     confirm_sound: str = ""
+    # Desktop banners are secondary to chimes; GNOME can queue them behind
+    # Cursor's tool-approval notifications until those are dismissed.
+    desktop_notifications: bool = True
     state_dir: Path = field(default_factory=lambda: _xdg_state_home() / "playwait")
     config_path: Path = field(
         default_factory=lambda: _xdg_config_home() / "playwait" / "config.toml"
@@ -116,4 +119,6 @@ def load_config(path: Path | None = None) -> Config:
             setattr(cfg, delay_key, max(0.0, float(data[delay_key])))
     if "state_dir" in data and isinstance(data["state_dir"], str):
         cfg.state_dir = Path(data["state_dir"]).expanduser()
+    if "desktop_notifications" in data and isinstance(data["desktop_notifications"], bool):
+        cfg.desktop_notifications = data["desktop_notifications"]
     return cfg
