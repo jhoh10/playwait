@@ -16,7 +16,7 @@ Python 3.12+.
 ## Install
 
 ```bash
-git clone <this-repo> ~/src/playwait
+git clone https://github.com/jhoh10/playwait.git ~/src/playwait
 cd ~/src/playwait
 python3 -m venv .venv
 source .venv/bin/activate
