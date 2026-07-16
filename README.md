@@ -2,7 +2,7 @@
 
 Personal Linux helper: while you focus on a game (or another fullscreen task), **Cursor agents** can run in the background. When an agent turn finishes, playwait pauses the focused window, minimizes it, focuses Cursor, and plays a soft chime. After you answer **every** chat that was waiting, it sends you back. A short cool-down then avoids frantic back-and-forth.
 
-**Supported environment (early / 0.0.x):** Ubuntu 24.04, GNOME on **X11** (not Wayland). Esc-based pause (not process freeze).
+**Supported environment (0.1.x):** Ubuntu 24.04, GNOME on **X11** (not Wayland). Esc-based pause (not process freeze).
 
 ## Requirements
 
@@ -199,6 +199,6 @@ pytest
 
 MIT — see [LICENSE](LICENSE).
 
-## Out of scope (0.0.x)
+## Out of scope (0.1.x)
 
 Wayland, SIGSTOP pause mode, non-Cursor agents. Exact “Allow/Deny UI appeared” events (Cursor has no PermissionRequest hook — Shell patterns are approximate).
