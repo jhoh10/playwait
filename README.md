@@ -21,7 +21,7 @@ cd ~/src/playwait
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e '.[dev]'
-chmod +x hooks/on-stop.sh hooks/on-submit.sh
+chmod +x hooks/on-stop.sh hooks/on-submit.sh hooks/on-permission-*.sh
 ```
 
 Use the venv binary by absolute path in shortcuts and hooks (GNOME/Cursor often lack your shell `PATH`):
@@ -42,9 +42,15 @@ For a guided setup in Cursor, run the **playwait-setup** skill (see `.cursor/ski
    ```
 
    Confirm with `playwait status` — you want `"mode": "armed"` and a non-null `"window_id"`.
-3. When an agent finishes: soft chime → pause → minimize → Cursor. Extra finished chats while you’re already interrupted stay tracked; you are not yanked again.
-4. Reply in Cursor. After each send, if other chats still need you, you stay in Cursor. When the **last** waiting chat is answered, playwait returns you to the window and starts a cool-down that scales with how much thought your replies took (**30s–3 min**, local heuristics — short “yes” → short cool-down; longer/code-heavy replies → longer).
-5. When done for the night:
+3. When an agent finishes: soft chime → pause → minimize → Cursor. Extra finished chats while you’re already interrupted stay tracked; you are not yanked again. Mid-run **tool approvals** (MCP always; Shell when the command matches risk patterns) also yank immediately — they **bypass** cool-down. After you Allow, playwait **stays in Cursor** so a burst of approvals (or the imminent turn-end) does not bounce you back to the game.
+4. Reply in Cursor. After each send, if other chats still need you, you stay in Cursor. When the **last fresh** waiting chat is answered, playwait returns you to the window and starts a cool-down that scales with reply effort (**30s–3 min** by default). Waiting chats with **no activity for 15 minutes** are dropped automatically. If you leave the game for Cursor during cool-down, cool-down is abandoned (and a deferred agent-ready interrupt, if any, soft-fires without stealing focus back through the game).
+5. Done with Cursor but won’t reply to a waiting chat? Clear and return:
+
+   ```bash
+   "$HOME/src/playwait/.venv/bin/playwait" release
+   ```
+
+6. When done for the night:
 
    ```bash
    "$HOME/src/playwait/.venv/bin/playwait" disarm
@@ -71,6 +77,26 @@ Create or edit `~/.cursor/hooks.json` with **absolute** paths (adjust if your cl
       {
         "command": "/home/YOU/src/playwait/hooks/on-submit.sh"
       }
+    ],
+    "beforeMCPExecution": [
+      {
+        "command": "/home/YOU/src/playwait/hooks/on-permission-mcp.sh"
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": "/home/YOU/src/playwait/hooks/on-permission-shell.sh"
+      }
+    ],
+    "afterMCPExecution": [
+      {
+        "command": "/home/YOU/src/playwait/hooks/on-permission-done.sh"
+      }
+    ],
+    "afterShellExecution": [
+      {
+        "command": "/home/YOU/src/playwait/hooks/on-permission-done.sh"
+      }
     ]
   }
 }
@@ -80,12 +106,17 @@ Replace `/home/YOU/src/playwait` with your real checkout path (e.g. output of `p
 
 - **`stop`** — agent turn ended → interrupt (and remember that chat).
 - **`beforeSubmitPrompt`** — you hit send → clear that chat; return only when none remain.
+- **`beforeMCPExecution`** — MCP tool about to run → auto-interrupt (no cool-down).
+- **`beforeShellExecution`** — Shell about to run → interrupt when command matches risk patterns (or `ask-always` if configured).
+- **`afterMCPExecution` / `afterShellExecution`** — after Allow (tool finished) → clear the permission gate; stay in Cursor (return on reply / `release`).
 
 Dry-run while disarmed:
 
 ```bash
 echo '{"status":"completed","conversation_id":"test"}' | playwait on-stop
 echo '{"conversation_id":"test","prompt":"hi"}' | playwait on-submit
+PLAYWAIT_PERMISSION_SOURCE=mcp echo '{"tool_name":"demo"}' | playwait on-permission
+PLAYWAIT_PERMISSION_SOURCE=shell echo '{"command":"sudo true"}' | playwait on-permission
 ```
 
 ## GNOME arm / disarm hotkeys
@@ -96,8 +127,9 @@ echo '{"conversation_id":"test","prompt":"hi"}' | playwait on-submit
 |------|---------|
 | playwait arm | `$HOME/src/playwait/.venv/bin/playwait arm` |
 | playwait disarm | `$HOME/src/playwait/.venv/bin/playwait disarm` |
+| playwait release | `$HOME/src/playwait/.venv/bin/playwait release` |
 
-GNOME may not expand `$HOME` in shortcuts — paste the expanded absolute path instead. Suggested chords: **Super+Alt+A** (arm), **Super+Alt+D** (disarm).
+GNOME may not expand `$HOME` in shortcuts — paste the expanded absolute path instead. Suggested chords: **Super+Alt+A** (arm), **Super+Alt+D** (disarm), **Super+Alt+R** (release).
 
 ## Config (optional)
 
@@ -111,6 +143,17 @@ cooldown_min_seconds = 30
 cooldown_max_seconds = 180
 # Fallback when you focus the window manually (no scored reply):
 cooldown_seconds = 30
+# Drop waiting chats with no stop/submit activity this long (seconds):
+awaiting_ttl_seconds = 900   # 15 minutes
+# For faster iteration while developing, you can temporarily use:
+# cooldown_min_seconds = 15
+# cooldown_max_seconds = 60
+# cooldown_seconds = 15
+# Leave game during cool-down for this long → abandon cool-down:
+# cooldown_abandon_seconds = 1.0
+# Tool-permission auto-interrupt:
+# mcp_permission_interrupt = true
+# shell_permission_interrupt = "patterns"  # or "ask-always" or "off"
 cursor_name = "Cursor"
 cursor_class = "cursor"
 # interrupt_lead_seconds = 1.0   # chime, then wait before window changes
@@ -131,6 +174,7 @@ playwait status   # mode + awaiting_reply snapshot
 
 - Prefer **borderless windowed** over exclusive fullscreen.
 - Pause defaults to **Esc**. Process freeze (`SIGSTOP`) is not in this early release yet.
+- If the armed window is **closed**, playwait auto-disarms on the next stop/submit/permission/return/watcher tick (notification: “Armed window closed — disarmed”). Re-arm after launching the game again.
 
 ## Notifications
 
@@ -157,4 +201,4 @@ MIT — see [LICENSE](LICENSE).
 
 ## Out of scope (0.0.x)
 
-Mid-run Allow/Deny detection, Wayland, SIGSTOP pause mode, non-Cursor agents.
+Wayland, SIGSTOP pause mode, non-Cursor agents. Exact “Allow/Deny UI appeared” events (Cursor has no PermissionRequest hook — Shell patterns are approximate).

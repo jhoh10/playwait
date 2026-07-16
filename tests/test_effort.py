@@ -30,6 +30,13 @@ def test_code_fence_boosts() -> None:
     assert with_code > plain
 
 
+def test_cooldown_scale_15_to_60() -> None:
+    assert cooldown_seconds_for_effort(0.0, minimum=15, maximum=60) == 15
+    assert cooldown_seconds_for_effort(1.0, minimum=15, maximum=60) == 60
+    mid = cooldown_seconds_for_effort(0.5, minimum=15, maximum=60)
+    assert 35 <= mid <= 40
+
+
 def test_cooldown_scale_30_to_180() -> None:
     assert cooldown_seconds_for_effort(0.0, minimum=30, maximum=180) == 30
     assert cooldown_seconds_for_effort(1.0, minimum=30, maximum=180) == 180

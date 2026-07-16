@@ -39,6 +39,15 @@ class Config:
     # Desktop banners are secondary to chimes; GNOME can queue them behind
     # Cursor's tool-approval notifications until those are dismissed.
     desktop_notifications: bool = True
+    # Leave the game during cool-down this long → abandon cool-down (seconds).
+    cooldown_abandon_seconds: float = 1.0
+    # Drop awaiting chats with no stop/submit activity for this long (seconds).
+    awaiting_ttl_seconds: int = 900  # 15 minutes
+    # Tool-permission auto-interrupt (bypasses cool-down; resume skips cool-down).
+    mcp_permission_interrupt: bool = True
+    # off | patterns | ask-always
+    shell_permission_interrupt: str = "patterns"
+    shell_permission_patterns: list[str] = field(default_factory=list)
     state_dir: Path = field(default_factory=lambda: _xdg_state_home() / "playwait")
     config_path: Path = field(
         default_factory=lambda: _xdg_config_home() / "playwait" / "config.toml"
@@ -121,4 +130,24 @@ def load_config(path: Path | None = None) -> Config:
         cfg.state_dir = Path(data["state_dir"]).expanduser()
     if "desktop_notifications" in data and isinstance(data["desktop_notifications"], bool):
         cfg.desktop_notifications = data["desktop_notifications"]
+    if "cooldown_abandon_seconds" in data and isinstance(
+        data["cooldown_abandon_seconds"], (int, float)
+    ):
+        cfg.cooldown_abandon_seconds = max(0.0, float(data["cooldown_abandon_seconds"]))
+    if "mcp_permission_interrupt" in data and isinstance(
+        data["mcp_permission_interrupt"], bool
+    ):
+        cfg.mcp_permission_interrupt = data["mcp_permission_interrupt"]
+    if "shell_permission_interrupt" in data and isinstance(
+        data["shell_permission_interrupt"], str
+    ):
+        cfg.shell_permission_interrupt = data["shell_permission_interrupt"].strip().lower()
+    if "shell_permission_patterns" in data and isinstance(
+        data["shell_permission_patterns"], list
+    ):
+        cfg.shell_permission_patterns = [
+            str(p) for p in data["shell_permission_patterns"] if str(p).strip()
+        ]
+    if "awaiting_ttl_seconds" in data and isinstance(data["awaiting_ttl_seconds"], int):
+        cfg.awaiting_ttl_seconds = max(0, data["awaiting_ttl_seconds"])
     return cfg
