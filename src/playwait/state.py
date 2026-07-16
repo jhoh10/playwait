@@ -34,7 +34,7 @@ class State:
     # When True, resume from interrupt goes straight to armed (no cool-down).
     # Used for tool-permission interrupts so the next approval can yank immediately.
     skip_cooldown: bool = False
-    # Set when a permission-gate interrupt is active; after-tool hooks may auto-return.
+    # Set when a permission-gate interrupt is active; after-tool hooks clear it.
     permission_gate_active: bool = False
 
     def to_dict(self) -> dict[str, Any]:

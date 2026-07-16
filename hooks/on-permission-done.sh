@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Cursor afterMCPExecution / afterShellExecution → return to game after approval.
+# Cursor afterMCPExecution / afterShellExecution → clear permission gate (stay in Cursor).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

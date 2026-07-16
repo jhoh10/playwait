@@ -383,10 +383,11 @@ def handle_permission_done(
     config: Config,
     state: State,
 ) -> State:
-    """afterShellExecution / afterMCPExecution: return to game after an approval.
+    """afterShellExecution / afterMCPExecution: clear the permission gate.
 
-    Fires after Allow (tool finished) or may not fire on Deny. Only auto-returns
-    when this interrupt was for a permission gate and no chats still need a reply.
+    Fires after Allow (tool finished) or may not fire on Deny. Stays in Cursor so
+    a burst of mid-run approvals (or an imminent stop) does not thrash focus back
+    to the game. Return happens on submit / release as usual.
     """
     if state.mode == Mode.IDLE or not state.window_id:
         return state
@@ -396,23 +397,14 @@ def handle_permission_done(
     if not state.permission_gate_active:
         log.info("permission-done: ignore (no active permission gate)")
         return state
-    if state.awaiting_reply:
-        log.info(
-            "permission-done: stay in Cursor; still awaiting %s",
-            state.awaiting_reply,
-        )
-        # Gate handled; don't yank back while turn-end replies are outstanding.
-        state.permission_gate_active = False
-        return state
-    if state.mode != Mode.INTERRUPTED:
-        state.permission_gate_active = False
-        log.info("permission-done: mode=%s — clear gate only", state.mode.value)
-        return state
 
-    log.info("permission-done: returning to game (no cool-down)")
     state.permission_gate_active = False
-    state.skip_cooldown = True
-    return return_to_game(desktop, config, state)
+    log.info(
+        "permission-done: stay in Cursor (gate cleared) mode=%s awaiting=%s",
+        state.mode.value,
+        state.awaiting_reply,
+    )
+    return state
 
 
 def release(

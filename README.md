@@ -42,7 +42,7 @@ For a guided setup in Cursor, run the **playwait-setup** skill (see `.cursor/ski
    ```
 
    Confirm with `playwait status` — you want `"mode": "armed"` and a non-null `"window_id"`.
-3. When an agent finishes: soft chime → pause → minimize → Cursor. Extra finished chats while you’re already interrupted stay tracked; you are not yanked again. Mid-run **tool approvals** (MCP always; Shell when the command matches risk patterns) also yank immediately — they **bypass** cool-down, and after you Allow (tool finishes) playwait **returns you to the game** with no cool-down timer.
+3. When an agent finishes: soft chime → pause → minimize → Cursor. Extra finished chats while you’re already interrupted stay tracked; you are not yanked again. Mid-run **tool approvals** (MCP always; Shell when the command matches risk patterns) also yank immediately — they **bypass** cool-down. After you Allow, playwait **stays in Cursor** so a burst of approvals (or the imminent turn-end) does not bounce you back to the game.
 4. Reply in Cursor. After each send, if other chats still need you, you stay in Cursor. When the **last fresh** waiting chat is answered, playwait returns you to the window and starts a cool-down that scales with reply effort (**30s–3 min** by default). Waiting chats with **no activity for 15 minutes** are dropped automatically. If you leave the game for Cursor during cool-down, cool-down is abandoned (and a deferred agent-ready interrupt, if any, soft-fires without stealing focus back through the game).
 5. Done with Cursor but won’t reply to a waiting chat? Clear and return:
 
@@ -108,7 +108,7 @@ Replace `/home/YOU/src/playwait` with your real checkout path (e.g. output of `p
 - **`beforeSubmitPrompt`** — you hit send → clear that chat; return only when none remain.
 - **`beforeMCPExecution`** — MCP tool about to run → auto-interrupt (no cool-down).
 - **`beforeShellExecution`** — Shell about to run → interrupt when command matches risk patterns (or `ask-always` if configured).
-- **`afterMCPExecution` / `afterShellExecution`** — after Allow (tool finished) → return to game when the interrupt was for a permission gate.
+- **`afterMCPExecution` / `afterShellExecution`** — after Allow (tool finished) → clear the permission gate; stay in Cursor (return on reply / `release`).
 
 Dry-run while disarmed:
 

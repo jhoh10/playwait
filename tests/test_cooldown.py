@@ -286,7 +286,8 @@ def test_permission_mcp_interrupts_and_skips_cooldown(tmp_path: Path, monkeypatc
     assert state.cooldown_until is None
 
 
-def test_permission_done_returns_to_game(tmp_path: Path, monkeypatch) -> None:
+def test_permission_done_stays_in_cursor(tmp_path: Path, monkeypatch) -> None:
+    """After Allow, stay interrupted — do not bounce back to the game mid-agent."""
     from playwait.service import handle_permission, handle_permission_done
 
     desktop = RecordingDesktop(active_id="0xgame")
@@ -298,11 +299,12 @@ def test_permission_done_returns_to_game(tmp_path: Path, monkeypatch) -> None:
     assert state.permission_gate_active is True
     # Simulate user still in Cursor after Allow; tool finished.
     desktop.active_id = "0x200"
+    activated_before = list(desktop.activated)
     state = handle_permission_done(desktop, _cfg(tmp_path), state)
-    assert state.mode == Mode.ARMED
+    assert state.mode == Mode.INTERRUPTED
     assert state.permission_gate_active is False
-    assert state.skip_cooldown is False
-    assert desktop.activated[-1] == "0xgame"
+    assert state.skip_cooldown is True
+    assert desktop.activated == activated_before
 
 
 def test_permission_done_stays_if_awaiting_reply(tmp_path: Path, monkeypatch) -> None:

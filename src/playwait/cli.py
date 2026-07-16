@@ -65,7 +65,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     sub.add_parser(
         "on-permission-done",
-        help="Cursor afterShellExecution / afterMCPExecution — return after approval",
+        help="Cursor afterShellExecution / afterMCPExecution — clear permission gate",
     )
     sub.add_parser("resume-watch", help="Internal: wait for game focus after interrupt")
     sub.add_parser("cooldown-wait", help="Internal: wait out cool-down / deferred yank")
