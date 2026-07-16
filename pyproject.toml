@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Pause and minimize a game when a Cursor agent finishes a turn"
 readme = "README.md"
 requires-python = ">=3.12"
+license = { text = "MIT" }
 dependencies = []
 
 [project.optional-dependencies]

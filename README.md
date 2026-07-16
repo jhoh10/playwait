@@ -1,13 +1,14 @@
 # playwait
 
-Pause and minimize an armed game when a **Cursor agent finishes a turn**, raise Cursor, play a peaceful sound, then **return you to the game when you’ve answered every chat that was waiting**. After resume, a **~2 minute cool-down** blocks another yank; if an agent finishes during cool-down, you get **one deferred yank** when it ends.
+Personal Linux helper: while you play a single-player game (e.g. Skyrim on Proton), **Cursor agents** can run in the background. When an agent turn finishes, playwait pauses the game, minimizes it, focuses Cursor, and plays a soft chime. After you answer **every** chat that was waiting, it sends you back to the game. A short cool-down then avoids frantic back-and-forth.
 
-## Requirements (Ubuntu 24.04 / GNOME X11)
+**Supported environment (v0.1):** Ubuntu 24.04, GNOME on **X11** (not Wayland). Esc-based in-game pause (not process freeze).
+
+## Requirements
 
 ```bash
 sudo apt install xdotool wmctrl libnotify-bin
-# PipeWire sound player (usually present):
-# pw-play  — or paplay from pulseaudio-utils
+# Sound: pw-play (PipeWire) or paplay
 ```
 
 Python 3.12+.
@@ -15,65 +16,45 @@ Python 3.12+.
 ## Install
 
 ```bash
-cd /path/to/playwait
+git clone <this-repo> ~/src/playwait
+cd ~/src/playwait
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e '.[dev]'
+chmod +x hooks/on-stop.sh hooks/on-submit.sh
 ```
 
-Put `playwait` on your PATH (venv `bin`, or `pip install --user -e .`).
+Use the venv binary by absolute path in shortcuts and hooks (GNOME/Cursor often lack your shell `PATH`):
+
+```bash
+echo "$HOME/src/playwait/.venv/bin/playwait"
+```
 
 ## Daily use
 
-1. Focus Skyrim (prefer **borderless windowed** under Proton).
-2. **Arm** the game so playwait knows which window to yank.
-
-   Arming means: “the window that is focused right now is the game.” Focus Skyrim first, then run:
+1. Run the game in **borderless windowed** mode if using Proton.
+2. Focus the game and **arm** it (see hotkeys below):
 
    ```bash
-   playwait arm
+   "$HOME/src/playwait/.venv/bin/playwait" arm
    ```
 
-   You should get a quiet desktop notification (and soft confirm sound) that the window was armed. Check anytime with:
+   Confirm with `playwait status` — you want `"mode": "armed"` and a non-null `"window_id"`.
+3. When an agent finishes: soft chime → pause → minimize → Cursor. Extra finished chats while you’re already interrupted stay tracked; you are not yanked again.
+4. Reply in Cursor. After each send, if other chats still need you, you stay in Cursor. When the **last** waiting chat is answered, playwait returns you to the game and starts a ~2 minute cool-down.
+5. When done for the night:
 
    ```bash
-   playwait status
-   ```
-
-   You want `"mode": "armed"` and a non-null `"window_id"`.
-
-   Doing this from the terminal every time is awkward in fullscreen, so bind **arm** (and **disarm**) as GNOME custom shortcuts once:
-
-   1. Open **Settings → Keyboard → View and Customize Shortcuts → Custom Shortcuts**.
-   2. Click **+** / **Add Shortcut**.
-   3. Name it e.g. `playwait arm`.
-   4. For **Command**, use the **absolute path** to the installed CLI (not bare `playwait`, unless that is already on PATH for GUI apps — often it is not). After a venv install, that looks like:
-
-      ```text
-      /home/jon/projects/productivity/playwait/.venv/bin/playwait arm
-      ```
-
-      Adjust the path if your checkout or venv lives elsewhere.
-   5. Assign a hotkey you will not hit by accident while playing (or that you only use when starting a play+agent session).
-   6. Repeat for `playwait disarm` with the same binary path and `disarm` instead of `arm`.
-
-   Then each session: focus Skyrim → press your arm hotkey → leave Cursor agents running in the background.
-
-3. When a Cursor agent turn ends, playwait: Esc → minimize game → focus Cursor → soft sound. If **another** chat also finishes while you’re already interrupted, you stay in Cursor; playwait remembers both chats still need a reply.
-4. Reply in Cursor. After each send, if other chats still need you, you stay put (notify: “N chats still need a reply”). When the **last** waiting chat gets a reply, playwait raises the game, unpauses, and starts the ~2 minute cool-down. You can still alt-tab back manually anytime.
-5. When done for the night, **disarm** (hotkey or terminal) so later agent finishes do not touch your desktop:
-
-   ```bash
-   playwait disarm
+   "$HOME/src/playwait/.venv/bin/playwait" disarm
    ```
 
 ```bash
-playwait status   # JSON state — look at awaiting_reply for open chats
+playwait status   # awaiting_reply lists chats still needing a reply
 ```
 
 ## Cursor hooks
 
-You need **two** hooks. Merge into `~/.cursor/hooks.json` (create if missing), using **absolute** paths:
+Create or edit `~/.cursor/hooks.json` with **absolute** paths (adjust if your clone is elsewhere):
 
 ```json
 {
@@ -81,28 +62,24 @@ You need **two** hooks. Merge into `~/.cursor/hooks.json` (create if missing), u
   "hooks": {
     "stop": [
       {
-        "command": "/absolute/path/to/playwait/hooks/on-stop.sh"
+        "command": "/home/YOU/src/playwait/hooks/on-stop.sh"
       }
     ],
     "beforeSubmitPrompt": [
       {
-        "command": "/absolute/path/to/playwait/hooks/on-submit.sh"
+        "command": "/home/YOU/src/playwait/hooks/on-submit.sh"
       }
     ]
   }
 }
 ```
 
-Make the wrappers executable:
+Replace `/home/YOU/src/playwait` with your real checkout path (e.g. output of `pwd` inside the repo).
 
-```bash
-chmod +x hooks/on-stop.sh hooks/on-submit.sh
-```
+- **`stop`** — agent turn ended → interrupt (and remember that chat).
+- **`beforeSubmitPrompt`** — you hit send → clear that chat; return to game only when none remain.
 
-- **`stop`** — agent turn ended → yank (and remember that chat’s `conversation_id`).
-- **`beforeSubmitPrompt`** — you hit send → clear that chat; return to game only when `awaiting_reply` is empty.
-
-Dry-run while disarmed (should no-op):
+Dry-run while disarmed:
 
 ```bash
 echo '{"status":"completed","conversation_id":"test"}' | playwait on-stop
@@ -111,14 +88,14 @@ echo '{"conversation_id":"test","prompt":"hi"}' | playwait on-submit
 
 ## GNOME arm / disarm hotkeys
 
-See **Daily use**, step 2, for the full walkthrough. Summary:
+**Settings → Keyboard → View and Customize Shortcuts → Custom Shortcuts**
 
 | Name | Command |
 |------|---------|
-| playwait arm | `/path/to/playwait/.venv/bin/playwait arm` |
-| playwait disarm | `/path/to/playwait/.venv/bin/playwait disarm` |
+| playwait arm | `$HOME/src/playwait/.venv/bin/playwait arm` |
+| playwait disarm | `$HOME/src/playwait/.venv/bin/playwait disarm` |
 
-Use absolute paths so the shortcuts work when GNOME does not inherit your shell PATH.
+GNOME may not expand `$HOME` in shortcuts — paste the expanded absolute path instead. Suggested chords: **Super+Alt+A** (arm), **Super+Alt+D** (disarm).
 
 ## Config (optional)
 
@@ -130,39 +107,29 @@ resume_key = "Escape"
 cooldown_seconds = 120
 cursor_name = "Cursor"
 cursor_class = "cursor"
-# Soften yank-to-Cursor (seconds). True cross-fade isn't available on X11;
-# staging + GNOME's own minimize animation is the gentle path.
-# Chime plays immediately; window transition starts after interrupt_lead_seconds.
-# interrupt_lead_seconds = 1.0
+# interrupt_lead_seconds = 1.0   # chime, then wait before window changes
 # interrupt_step_seconds = 0.4
 # return_lead_seconds = 0.35
-# interrupt_sound = "/path/to/soft.wav"
-# confirm_sound = "/path/to/soft.wav"
 ```
 
-State/logs: `~/.local/state/playwait/`.
+State and logs: `~/.local/state/playwait/`.
 
 ## Proton / Skyrim tips
 
-- Use **borderless windowed** so minimize/focus work reliably.
-- v1 pauses with **Esc** (in-game menu). If Proton swallows the key, a later `pause_mode = sigstop` (Steam reaper tree, as in [SDH-PauseGames](https://github.com/popsUlfr/SDH-PauseGames)) is the proven fallback — not implemented yet.
-- Exclusive fullscreen may fight window tools.
-
-## Smoke checklist
-
-- [ ] `pytest`
-- [ ] `echo '{"status":"completed"}' | playwait on-stop` while disarmed → no yank
-- [ ] Arm Skyrim → finish a Cursor turn → pause + minimize + Cursor + sound
-- [ ] Reply in that chat → auto return to game + cool-down
-- [ ] Two chats finish → reply to one → stay in Cursor; reply to second → return to game
-- [ ] Within cool-down another agent finish does not yank; after ~2m one deferred yank if pending
+- Prefer **borderless windowed** over exclusive fullscreen.
+- Pause uses **Esc** (in-game menu). Process freeze (`SIGSTOP`) is a known Proton approach elsewhere; not in v0.1 yet.
 
 ## Development
 
 ```bash
+source .venv/bin/activate
 pytest
 ```
 
-## Out of scope (v1)
+## License
 
-Mid-run Allow/Deny detection, Wayland adapters, SIGSTOP pause mode, Claude Code hooks.
+MIT — see [LICENSE](LICENSE).
+
+## Out of scope (v0.1)
+
+Mid-run Allow/Deny detection, Wayland, SIGSTOP pause mode, non-Cursor agents.
