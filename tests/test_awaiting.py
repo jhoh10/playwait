@@ -94,3 +94,30 @@ def test_stop_refreshes_activity(tmp_path: Path, monkeypatch) -> None:
         desktop, _cfg(tmp_path), state, conversation_id="c1", now=5_000.0
     )
     assert state.awaiting_activity["c1"] == 5_000.0
+
+
+def test_submit_auto_disarms_when_window_gone(tmp_path: Path) -> None:
+    desktop = RecordingDesktop(active_id="0x200", gone_windows={"0xgame"})
+    state = State(
+        mode=Mode.INTERRUPTED,
+        window_id="0xgame",
+        awaiting_reply=["c1"],
+        awaiting_activity={"c1": 1.0},
+        paused=True,
+    )
+    state = handle_submit(
+        desktop, _cfg(tmp_path), state, conversation_id="c1", prompt="ok"
+    )
+    assert state.mode == Mode.IDLE
+    assert state.window_id is None
+    assert desktop.activated == []
+    assert any("closed" in body.lower() for _, body in desktop.notifications)
+
+
+def test_stop_auto_disarms_when_window_gone(tmp_path: Path) -> None:
+    desktop = RecordingDesktop(gone_windows={"0xgame"})
+    state = State(mode=Mode.ARMED, window_id="0xgame")
+    state = handle_stop(desktop, _cfg(tmp_path), state, conversation_id="c1")
+    assert state.mode == Mode.IDLE
+    assert state.awaiting_reply == []
+    assert desktop.minimized == []

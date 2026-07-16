@@ -174,6 +174,7 @@ playwait status   # mode + awaiting_reply snapshot
 
 - Prefer **borderless windowed** over exclusive fullscreen.
 - Pause defaults to **Esc**. Process freeze (`SIGSTOP`) is not in this early release yet.
+- If the armed window is **closed**, playwait auto-disarms on the next stop/submit/permission/return/watcher tick (notification: “Armed window closed — disarmed”). Re-arm after launching the game again.
 
 ## Notifications
 

@@ -18,6 +18,7 @@ _NOTIFY_EXPIRE_MS = "4000"
 class Desktop(Protocol):
     def active_window_id(self) -> str | None: ...
     def window_pid(self, window_id: str) -> int | None: ...
+    def window_exists(self, window_id: str) -> bool: ...
     def send_key(self, window_id: str, key: str, *, activate: bool = True) -> bool: ...
     def minimize(self, window_id: str) -> bool: ...
     def activate(self, window_id: str) -> bool: ...
@@ -57,14 +58,20 @@ class RecordingDesktop:
     fail_keys: bool = False
     fail_minimize: bool = False
     fail_activate: bool = False
+    gone_windows: set[str] = field(default_factory=set)
 
     def active_window_id(self) -> str | None:
         return self.active_id
 
     def window_pid(self, window_id: str) -> int | None:
+        if window_id in self.gone_windows:
+            return None
         if window_id in self.pid_by_window:
             return self.pid_by_window[window_id]
         return 4242 if window_id else None
+
+    def window_exists(self, window_id: str) -> bool:
+        return bool(window_id) and window_id not in self.gone_windows
 
     def send_key(self, window_id: str, key: str, *, activate: bool = True) -> bool:
         if self.fail_keys:
@@ -144,6 +151,32 @@ class X11Desktop:
             return int(proc.stdout.strip())
         except ValueError:
             return None
+
+    def window_exists(self, window_id: str) -> bool:
+        """True if the X11 window id still refers to a live window."""
+        if not window_id:
+            return False
+        if shutil.which("xdotool"):
+            proc = _run(["xdotool", "getwindowpid", window_id], timeout=1.0)
+            if proc and proc.returncode == 0 and proc.stdout.strip():
+                return True
+            proc = _run(["xdotool", "getwindowname", window_id], timeout=1.0)
+            if proc and proc.returncode == 0:
+                return True
+            return False
+        if shutil.which("wmctrl"):
+            hex_id = _normalize_wmctrl_id(window_id)
+            proc = _run(["wmctrl", "-l"], timeout=2.0)
+            if not proc or proc.returncode != 0:
+                # Tools present but listing failed — don't auto-disarm on probe error.
+                return True
+            for line in proc.stdout.splitlines():
+                parts = line.split(None, 1)
+                if parts and _window_ids_equal(parts[0], hex_id):
+                    return True
+            return False
+        # No probe tools — assume still present rather than spuriously disarm.
+        return True
 
     def send_key(self, window_id: str, key: str, *, activate: bool = True) -> bool:
         if not shutil.which("xdotool"):

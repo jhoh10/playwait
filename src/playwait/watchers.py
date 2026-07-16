@@ -6,6 +6,7 @@ import time
 from playwait.actions import Desktop
 from playwait.config import Config
 from playwait.service import (
+    ensure_armed_window,
     load,
     on_cooldown_expiry,
     on_cooldown_left_game,
@@ -30,6 +31,10 @@ def run_resume_watch(desktop: Desktop, config: Config) -> int:
     settle = max(0.5, float(config.poll_interval_seconds))
     while time.time() < deadline:
         state = load(config)
+        state = ensure_armed_window(desktop, config, state)
+        if state.mode == Mode.IDLE:
+            persist(config, state)
+            return 0
         if state.mode != Mode.INTERRUPTED or not state.window_id:
             return 0
         active = desktop.active_window_id()
@@ -60,6 +65,10 @@ def run_cooldown_wait(desktop: Desktop, config: Config) -> int:
 
     while True:
         state = load(config)
+        state = ensure_armed_window(desktop, config, state)
+        if state.mode == Mode.IDLE:
+            persist(config, state)
+            return 0
         if state.mode != Mode.COOLDOWN:
             return 0
         if state.cooldown_until is None:

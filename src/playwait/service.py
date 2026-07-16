@@ -38,6 +38,26 @@ def interrupt_notify(desktop: Desktop, config: Config, body: str) -> None:
     desktop.play_sound(config.resolve_sound("interrupt"), wait=False)
 
 
+def ensure_armed_window(
+    desktop: Desktop,
+    config: Config,
+    state: State,
+) -> State:
+    """Auto-disarm if the armed window was closed / destroyed."""
+    if state.mode == Mode.IDLE or not state.window_id:
+        return state
+    if desktop.window_exists(state.window_id):
+        return state
+    log.warning(
+        "armed window %s no longer exists → auto-disarm (was mode=%s)",
+        state.window_id,
+        state.mode.value,
+    )
+    _cancel_watchers(state)
+    quiet_confirm(desktop, config, "playwait", "Armed window closed — disarmed")
+    return State()
+
+
 def do_interrupt(
     desktop: Desktop,
     config: Config,
@@ -177,6 +197,7 @@ def handle_stop(
     """Cursor stop hook entry: interrupt, set pending, or no-op."""
     now = time.time() if now is None else now
     cid = conversation_id or "_unscoped"
+    state = ensure_armed_window(desktop, config, state)
     if state.mode == Mode.IDLE or not state.window_id:
         log.info(
             "stop: ignored (disarmed) conversation=%s mode=%s",
@@ -241,6 +262,7 @@ def handle_submit(
 ) -> State:
     """Cursor beforeSubmitPrompt: clear this chat; return to game when none remain."""
     cid = conversation_id or "_unscoped"
+    state = ensure_armed_window(desktop, config, state)
     if state.mode == Mode.IDLE or not state.window_id:
         log.info(
             "submit: ignored (disarmed) conversation=%s mode=%s",
@@ -312,6 +334,7 @@ def handle_permission(
     cool-down; resume skips cool-down so the next approval can yank immediately.
     """
     empty: dict[str, Any] = {}
+    state = ensure_armed_window(desktop, config, state)
     if state.mode == Mode.IDLE or not state.window_id:
         log.info("permission: ignored (disarmed) source=%s", source)
         return state, empty
@@ -389,6 +412,7 @@ def handle_permission_done(
     a burst of mid-run approvals (or an imminent stop) does not thrash focus back
     to the game. Return happens on submit / release as usual.
     """
+    state = ensure_armed_window(desktop, config, state)
     if state.mode == Mode.IDLE or not state.window_id:
         return state
     dropped = prune_stale_awaiting(state, ttl_seconds=config.awaiting_ttl_seconds)
@@ -416,6 +440,7 @@ def release(
 
     Use when you're done in Cursor but won't send another message in a waiting chat.
     """
+    state = ensure_armed_window(desktop, config, state)
     if state.mode == Mode.IDLE or not state.window_id:
         log.info("release: ignored (disarmed)")
         return state
@@ -450,6 +475,7 @@ def release(
 
 def return_to_game(desktop: Desktop, config: Config, state: State) -> State:
     """Raise the armed game with a short soft lead-in."""
+    state = ensure_armed_window(desktop, config, state)
     if not state.window_id or state.mode != Mode.INTERRUPTED:
         log.info(
             "return_to_game: skipped mode=%s window_id=%s",
@@ -498,6 +524,7 @@ def on_resume_focus(
     cooldown_seconds: int | None = None,
 ) -> State:
     """Game focused again after interrupt."""
+    state = ensure_armed_window(desktop, config, state)
     if state.mode != Mode.INTERRUPTED or not state.window_id:
         return state
     if state.paused:
@@ -542,6 +569,7 @@ def on_cooldown_left_game(
     Do not raise the game. If a deferred stop is pending, enter interrupted
     quietly without a focus dance so the user can keep working in Cursor.
     """
+    state = ensure_armed_window(desktop, config, state)
     if state.mode != Mode.COOLDOWN:
         return state
     state.cooldown_wait_pid = None
@@ -556,6 +584,7 @@ def on_cooldown_left_game(
 
 
 def on_cooldown_expiry(desktop: Desktop, config: Config, state: State) -> State:
+    state = ensure_armed_window(desktop, config, state)
     if state.mode != Mode.COOLDOWN:
         return state
     state.cooldown_wait_pid = None
