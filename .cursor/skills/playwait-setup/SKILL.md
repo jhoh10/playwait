@@ -3,8 +3,8 @@ name: playwait-setup
 description: >-
   Guided interactive setup for playwait (Ubuntu/X11 Cursor hooks, venv install,
   GNOME arm/disarm hotkeys). Use when the user asks to install or set up
-  playwait, wire Cursor stop/beforeSubmitPrompt hooks, configure arm hotkeys,
-  or get playwait working for the first time.
+  playwait, wire Cursor stop/beforeSubmitPrompt/beforeMCPExecution/beforeShellExecution
+  hooks, configure arm hotkeys, or get playwait working for the first time.
 ---
 
 # playwait setup
@@ -16,7 +16,8 @@ Walk the user through a **minimal** first-time setup. Detect what’s already do
 After this skill finishes, the user should have:
 
 1. playwait installed in a venv (editable)
-2. `~/.cursor/hooks.json` pointing at **absolute** `on-stop.sh` / `on-submit.sh`
+2. `~/.cursor/hooks.json` pointing at **absolute** `on-stop.sh` / `on-submit.sh` /
+   `on-permission-mcp.sh` / `on-permission-shell.sh`
 3. Absolute-path GNOME custom shortcuts for arm/disarm (or clear skip)
 4. A dry-run proof that hooks invoke playwait
 
@@ -38,9 +39,9 @@ playwait setup:
 - [ ] Session is X11
 - [ ] Checkout + venv install
 - [ ] apt deps (xdotool, wmctrl, libnotify-bin)
-- [ ] Cursor hooks.json wired
+- [ ] Cursor hooks.json wired (stop, submit, MCP, shell)
 - [ ] GNOME arm/disarm shortcuts
-- [ ] Dry-run on-stop / on-submit
+- [ ] Dry-run on-stop / on-submit / on-permission
 ```
 
 ---
@@ -55,6 +56,8 @@ playwait setup:
    - `PW="$ROOT/.venv/bin/playwait"`
    - `STOP="$ROOT/hooks/on-stop.sh"`
    - `SUBMIT="$ROOT/hooks/on-submit.sh"`
+   - `PERM_MCP="$ROOT/hooks/on-permission-mcp.sh"`
+   - `PERM_SHELL="$ROOT/hooks/on-permission-shell.sh"`
 
 ---
 
@@ -123,19 +126,21 @@ Read `~/.cursor/hooks.json` if it exists.
   "version": 1,
   "hooks": {
     "stop": [{ "command": "STOP_PATH" }],
-    "beforeSubmitPrompt": [{ "command": "SUBMIT_PATH" }]
+    "beforeSubmitPrompt": [{ "command": "SUBMIT_PATH" }],
+    "beforeMCPExecution": [{ "command": "PERM_MCP_PATH" }],
+    "beforeShellExecution": [{ "command": "PERM_SHELL_PATH" }]
   }
 }
 ```
 
-Replace `STOP_PATH` / `SUBMIT_PATH` with `$STOP` / `$SUBMIT`.
+Replace paths with `$STOP` / `$SUBMIT` / `$PERM_MCP` / `$PERM_SHELL`.
 
 Rules:
 
 - Merge into existing hooks; do **not** wipe unrelated hooks.
-- Both commands **must** be absolute and end in `playwait/hooks/on-stop.sh` and `…/on-submit.sh` (not a parent `productivity/hooks/` path).
+- Commands **must** be absolute under `playwait/hooks/` (not a parent `productivity/hooks/` path).
 - If a wrong path is present, fix it and tell the user what changed.
-- After writing, show a one-line summary of the two commands.
+- After writing, summarize the four hook commands in one short block.
 
 If Cursor is already open, tell them hooks may need a **Cursor restart** (or new agent) to pick up `hooks.json` changes — one sentence only.
 
@@ -173,9 +178,11 @@ While **disarmed** (`"$PW" status` should show `"mode": "idle"` or no armed wind
 ```bash
 echo '{"status":"completed","conversation_id":"setup-test"}' | "$PW" on-stop
 echo '{"conversation_id":"setup-test","prompt":"hi"}' | "$PW" on-submit
+PLAYWAIT_PERMISSION_SOURCE=mcp echo '{"tool_name":"setup-test"}' | "$PW" on-permission
+PLAYWAIT_PERMISSION_SOURCE=shell echo '{"command":"ls"}' | "$PW" on-permission
 ```
 
-Expect JSON `{"continue": true}` from on-submit and no crash. Point them at:
+Expect JSON `{"continue": true}` from on-submit, JSON from on-permission (`{}` or `{"permission":"ask"}`), and no crash. Point them at:
 
 ```bash
 tail -n 20 ~/.local/state/playwait/playwait.log
@@ -209,4 +216,4 @@ Optional debug: `tail -f ~/.local/state/playwait/playwait.log`
 
 ## Out of scope for this skill
 
-Wayland, SIGSTOP pause, mid-run Allow/Deny, publishing releases, changing cool-down heuristics.
+Wayland, SIGSTOP pause, publishing releases, changing cool-down heuristics, tuning shell permission regexes (point at README/`config.toml`).

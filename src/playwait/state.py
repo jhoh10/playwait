@@ -29,6 +29,11 @@ class State:
     awaiting_reply: list[str] = field(default_factory=list)
     # Peak reply-effort score (0..1) across submits during this interrupt.
     peak_effort: float = 0.0
+    # When True, resume from interrupt goes straight to armed (no cool-down).
+    # Used for tool-permission interrupts so the next approval can yank immediately.
+    skip_cooldown: bool = False
+    # Set when a permission-gate interrupt is active; after-tool hooks may auto-return.
+    permission_gate_active: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -63,6 +68,8 @@ class State:
             paused=bool(data.get("paused", False)),
             awaiting_reply=_unique_preserve(awaiting_ids),
             peak_effort=peak_f,
+            skip_cooldown=bool(data.get("skip_cooldown", False)),
+            permission_gate_active=bool(data.get("permission_gate_active", False)),
         )
 
     def is_armed_target(self) -> bool:
