@@ -17,7 +17,9 @@ from playwait.state import Mode, State
 def _cfg(tmp_path: Path) -> Config:
     return Config(
         state_dir=tmp_path,
-        cooldown_seconds=120,
+        cooldown_seconds=30,
+        cooldown_min_seconds=30,
+        cooldown_max_seconds=180,
         interrupt_lead_seconds=0.0,
         interrupt_step_seconds=0.0,
         return_lead_seconds=0.0,
@@ -93,20 +95,54 @@ def test_submit_last_chat_returns_to_game(tmp_path: Path, monkeypatch) -> None:
         awaiting_reply=["chat-b"],
         paused=True,
         resume_watch_pid=111,
+        peak_effort=0.0,
     )
     killed: list[int] = []
     monkeypatch.setattr("playwait.service._kill_pid", lambda pid: killed.append(pid))
     state = handle_submit(
-        desktop, _cfg(tmp_path), state, conversation_id="chat-b"
+        desktop,
+        _cfg(tmp_path),
+        state,
+        conversation_id="chat-b",
+        prompt="yes",
     )
     assert state.awaiting_reply == []
     assert state.mode == Mode.COOLDOWN
     assert state.paused is False
-    assert state.cooldown_until == 10_000.0 + 120
+    assert state.cooldown_until == 10_000.0 + 30  # low-effort → min cool-down
     assert desktop.activated == ["0xgame"]
     assert ("0xgame", "Escape") in desktop.keys_sent
     assert 111 in killed
-    assert any("Back to game" in b for _, b in desktop.notifications)
+    assert any("cool-down" in b for _, b in desktop.notifications)
+
+
+def test_submit_high_effort_longer_cooldown(tmp_path: Path, monkeypatch) -> None:
+    desktop = RecordingDesktop()
+    monkeypatch.setattr("playwait.service._spawn_self", lambda args: 1)
+    monkeypatch.setattr("playwait.service.time.time", lambda: 50_000.0)
+    thoughtful = (
+        "Please redesign the cool-down so it scales with effort because a fixed "
+        "timer feels wrong. Consider heuristics on length and code fences instead "
+        "of an LLM call — implement that mapping carefully.\n\n"
+        "```\nprint('example')\n```\n"
+    )
+    state = State(
+        mode=Mode.INTERRUPTED,
+        window_id="0xgame",
+        awaiting_reply=["c1"],
+        paused=True,
+    )
+    state = handle_submit(
+        desktop,
+        _cfg(tmp_path),
+        state,
+        conversation_id="c1",
+        prompt=thoughtful,
+    )
+    assert state.mode == Mode.COOLDOWN
+    assert state.cooldown_until is not None
+    duration = state.cooldown_until - 50_000.0
+    assert duration >= 90
 
 
 def test_stop_during_cooldown_sets_pending(tmp_path: Path) -> None:
@@ -177,7 +213,7 @@ def test_resume_starts_cooldown(tmp_path: Path, monkeypatch) -> None:
     state = on_resume_focus(desktop, _cfg(tmp_path), state)
     assert state.mode == Mode.COOLDOWN
     assert state.paused is False
-    assert state.cooldown_until == 5_000.0 + 120
+    assert state.cooldown_until == 5_000.0 + 30
     assert state.cooldown_wait_pid == 888
     assert desktop.keys_sent == [("0xgame", "Escape")]
 

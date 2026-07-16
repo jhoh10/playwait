@@ -27,6 +27,8 @@ class State:
     paused: bool = False
     # Conversation IDs from Cursor stop hooks that still need a user reply.
     awaiting_reply: list[str] = field(default_factory=list)
+    # Peak reply-effort score (0..1) across submits during this interrupt.
+    peak_effort: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -44,6 +46,12 @@ class State:
         if not isinstance(awaiting, list):
             awaiting = []
         awaiting_ids = [str(x) for x in awaiting if x is not None and str(x)]
+        peak = data.get("peak_effort", 0.0)
+        try:
+            peak_f = float(peak)
+        except (TypeError, ValueError):
+            peak_f = 0.0
+        peak_f = max(0.0, min(1.0, peak_f))
         return cls(
             mode=mode,
             window_id=_as_optional_str(data.get("window_id")),
@@ -54,6 +62,7 @@ class State:
             cooldown_wait_pid=_as_optional_int(data.get("cooldown_wait_pid")),
             paused=bool(data.get("paused", False)),
             awaiting_reply=_unique_preserve(awaiting_ids),
+            peak_effort=peak_f,
         )
 
     def is_armed_target(self) -> bool:

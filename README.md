@@ -41,7 +41,7 @@ echo "$HOME/src/playwait/.venv/bin/playwait"
 
    Confirm with `playwait status` — you want `"mode": "armed"` and a non-null `"window_id"`.
 3. When an agent finishes: soft chime → pause → minimize → Cursor. Extra finished chats while you’re already interrupted stay tracked; you are not yanked again.
-4. Reply in Cursor. After each send, if other chats still need you, you stay in Cursor. When the **last** waiting chat is answered, playwait returns you to the game and starts a ~2 minute cool-down.
+4. Reply in Cursor. After each send, if other chats still need you, you stay in Cursor. When the **last** waiting chat is answered, playwait returns you to the game and starts a cool-down that scales with how much thought your replies took (**30s–3 min**, local heuristics — short “yes” → short cool-down; longer/code-heavy replies → longer).
 5. When done for the night:
 
    ```bash
@@ -104,7 +104,11 @@ GNOME may not expand `$HOME` in shortcuts — paste the expanded absolute path i
 ```toml
 pause_key = "Escape"
 resume_key = "Escape"
-cooldown_seconds = 120
+# Effort-scaled cool-down after return-to-game (seconds):
+cooldown_min_seconds = 30
+cooldown_max_seconds = 180
+# Fallback when you focus the game manually (no scored reply):
+cooldown_seconds = 30
 cursor_name = "Cursor"
 cursor_class = "cursor"
 # interrupt_lead_seconds = 1.0   # chime, then wait before window changes
@@ -113,6 +117,12 @@ cursor_class = "cursor"
 ```
 
 State and logs: `~/.local/state/playwait/`.
+
+```bash
+# Live debug (stop/submit, awaiting chats, return-to-game):
+tail -f ~/.local/state/playwait/playwait.log
+playwait status   # mode + awaiting_reply snapshot
+```
 
 ## Proton / Skyrim tips
 

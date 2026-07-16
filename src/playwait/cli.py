@@ -88,11 +88,13 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "on-submit":
         payload = _read_hook_payload()
+        prompt = payload.get("prompt")
         state = handle_submit(
             desktop,
             config,
             load(config),
             conversation_id=_conversation_id(payload),
+            prompt=str(prompt) if prompt is not None else "",
         )
         persist(config, state)
         # Always allow the prompt through.

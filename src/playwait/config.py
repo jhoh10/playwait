@@ -22,7 +22,11 @@ def _xdg_data_home() -> Path:
 class Config:
     pause_key: str = "Escape"
     resume_key: str = "Escape"
-    cooldown_seconds: int = 120
+    # Cool-down scales with reply effort between these bounds (seconds).
+    cooldown_min_seconds: int = 30
+    cooldown_max_seconds: int = 180
+    # Fallback when returning to the game without a scored reply (manual focus).
+    cooldown_seconds: int = 30
     cursor_name: str = "Cursor"
     cursor_class: str = "cursor"
     poll_interval_seconds: float = 0.4
@@ -93,6 +97,12 @@ def load_config(path: Path | None = None) -> Config:
             setattr(cfg, key, data[key])
     if "cooldown_seconds" in data and isinstance(data["cooldown_seconds"], int):
         cfg.cooldown_seconds = max(1, data["cooldown_seconds"])
+    if "cooldown_min_seconds" in data and isinstance(data["cooldown_min_seconds"], int):
+        cfg.cooldown_min_seconds = max(1, data["cooldown_min_seconds"])
+    if "cooldown_max_seconds" in data and isinstance(data["cooldown_max_seconds"], int):
+        cfg.cooldown_max_seconds = max(1, data["cooldown_max_seconds"])
+    if cfg.cooldown_max_seconds < cfg.cooldown_min_seconds:
+        cfg.cooldown_max_seconds = cfg.cooldown_min_seconds
     if "poll_interval_seconds" in data and isinstance(
         data["poll_interval_seconds"], (int, float)
     ):
