@@ -10,7 +10,7 @@ from pathlib import Path
 
 from playwait.actions import Desktop
 from playwait.config import Config
-from playwait.state import Mode, State, load_state, save_state
+from playwait.state import Mode, State, clear_awaiting, load_state, note_awaiting, save_state
 
 log = logging.getLogger("playwait")
 
@@ -68,6 +68,7 @@ def arm(desktop: Desktop, config: Config, state: State) -> State:
     state.paused = False
     state.resume_watch_pid = None
     state.cooldown_wait_pid = None
+    state.awaiting_reply = []
     quiet_confirm(desktop, config, "playwait", f"Armed window {wid}")
     return state
 
@@ -84,12 +85,15 @@ def handle_stop(
     config: Config,
     state: State,
     *,
+    conversation_id: str | None = None,
     now: float | None = None,
 ) -> State:
     """Cursor stop hook entry: interrupt, set pending, or no-op."""
     now = time.time() if now is None else now
     if state.mode == Mode.IDLE or not state.window_id:
         return state
+
+    note_awaiting(state, conversation_id or "_unscoped")
 
     # Reconcile overdue cool-down (e.g. after sleep).
     if state.mode == Mode.COOLDOWN and state.cooldown_overdue(now):
@@ -106,10 +110,56 @@ def handle_stop(
         return state
 
     if state.mode == Mode.INTERRUPTED:
-        # Already yanked; ignore duplicate stops until resume.
+        # Already yanked; still track this chat as needing a reply.
+        log.info(
+            "already interrupted; awaiting_reply=%s",
+            state.awaiting_reply,
+        )
         return state
 
     return do_interrupt(desktop, config, state)
+
+
+def handle_submit(
+    desktop: Desktop,
+    config: Config,
+    state: State,
+    *,
+    conversation_id: str | None = None,
+) -> State:
+    """Cursor beforeSubmitPrompt: clear this chat; return to game when none remain."""
+    if state.mode == Mode.IDLE or not state.window_id:
+        return state
+
+    clear_awaiting(state, conversation_id or "_unscoped")
+
+    if state.awaiting_reply:
+        n = len(state.awaiting_reply)
+        desktop.notify(
+            "playwait",
+            f"{n} chat{'s' if n != 1 else ''} still need a reply — staying in Cursor",
+        )
+        log.info("submit cleared one chat; still awaiting %s", state.awaiting_reply)
+        return state
+
+    if state.mode != Mode.INTERRUPTED:
+        # Already back in game / cool-down / armed — nothing to raise.
+        log.info("all chats answered; mode=%s — no return-to-game needed", state.mode)
+        return state
+
+    return return_to_game(desktop, config, state)
+
+
+def return_to_game(desktop: Desktop, config: Config, state: State) -> State:
+    """Raise the armed game so resume-watch (or we) can unpause and start cool-down."""
+    if not state.window_id or state.mode != Mode.INTERRUPTED:
+        return state
+
+    desktop.activate(state.window_id)
+    # Apply resume + cool-down immediately so we do not depend on polling focus.
+    state = on_resume_focus(desktop, config, state)
+    quiet_confirm(desktop, config, "playwait", "Back to game — all chats answered")
+    return state
 
 
 def on_resume_focus(desktop: Desktop, config: Config, state: State) -> State:
@@ -121,7 +171,10 @@ def on_resume_focus(desktop: Desktop, config: Config, state: State) -> State:
         state.paused = False
     state.mode = Mode.COOLDOWN
     state.cooldown_until = time.time() + config.cooldown_seconds
-    state.resume_watch_pid = None
+    # Stop resume-watch if it was still running; start cool-down waiter.
+    if state.resume_watch_pid:
+        _kill_pid(state.resume_watch_pid)
+        state.resume_watch_pid = None
     state.cooldown_wait_pid = _spawn_self(["cooldown-wait"])
     return state
 

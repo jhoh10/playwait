@@ -25,6 +25,8 @@ class State:
     resume_watch_pid: int | None = None
     cooldown_wait_pid: int | None = None
     paused: bool = False
+    # Conversation IDs from Cursor stop hooks that still need a user reply.
+    awaiting_reply: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -38,6 +40,10 @@ class State:
             mode = Mode(mode_raw)
         except ValueError:
             mode = Mode.IDLE
+        awaiting = data.get("awaiting_reply", [])
+        if not isinstance(awaiting, list):
+            awaiting = []
+        awaiting_ids = [str(x) for x in awaiting if x is not None and str(x)]
         return cls(
             mode=mode,
             window_id=_as_optional_str(data.get("window_id")),
@@ -47,6 +53,7 @@ class State:
             resume_watch_pid=_as_optional_int(data.get("resume_watch_pid")),
             cooldown_wait_pid=_as_optional_int(data.get("cooldown_wait_pid")),
             paused=bool(data.get("paused", False)),
+            awaiting_reply=_unique_preserve(awaiting_ids),
         )
 
     def is_armed_target(self) -> bool:
@@ -85,6 +92,34 @@ def _as_optional_float(value: Any) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _unique_preserve(items: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for item in items:
+        if item in seen:
+            continue
+        seen.add(item)
+        out.append(item)
+    return out
+
+
+def note_awaiting(state: State, conversation_id: str | None) -> None:
+    if not conversation_id:
+        return
+    if conversation_id not in state.awaiting_reply:
+        state.awaiting_reply.append(conversation_id)
+
+
+def clear_awaiting(state: State, conversation_id: str | None) -> bool:
+    """Remove a conversation from awaiting_reply. Returns True if it was present."""
+    if not conversation_id:
+        return False
+    if conversation_id not in state.awaiting_reply:
+        return False
+    state.awaiting_reply = [c for c in state.awaiting_reply if c != conversation_id]
+    return True
 
 
 def default_state() -> State:
