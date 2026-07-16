@@ -27,7 +27,7 @@ class Config:
     cursor_class: str = "cursor"
     poll_interval_seconds: float = 0.4
     # Soften yank-to-Cursor: chime first, then staged pause → minimize → focus.
-    interrupt_lead_seconds: float = 0.55
+    interrupt_lead_seconds: float = 1.0
     interrupt_step_seconds: float = 0.4
     return_lead_seconds: float = 0.35
     interrupt_sound: str = ""

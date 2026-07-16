@@ -132,7 +132,8 @@ cursor_name = "Cursor"
 cursor_class = "cursor"
 # Soften yank-to-Cursor (seconds). True cross-fade isn't available on X11;
 # staging + GNOME's own minimize animation is the gentle path.
-# interrupt_lead_seconds = 0.55
+# Chime plays immediately; window transition starts after interrupt_lead_seconds.
+# interrupt_lead_seconds = 1.0
 # interrupt_step_seconds = 0.4
 # return_lead_seconds = 0.35
 # interrupt_sound = "/path/to/soft.wav"
