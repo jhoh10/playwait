@@ -1,8 +1,8 @@
 # playwait
 
-Personal Linux helper: while you play a single-player game (e.g. Skyrim on Proton), **Cursor agents** can run in the background. When an agent turn finishes, playwait pauses the game, minimizes it, focuses Cursor, and plays a soft chime. After you answer **every** chat that was waiting, it sends you back to the game. A short cool-down then avoids frantic back-and-forth.
+Personal Linux helper: while you focus on a game (or another fullscreen task), **Cursor agents** can run in the background. When an agent turn finishes, playwait pauses the focused window, minimizes it, focuses Cursor, and plays a soft chime. After you answer **every** chat that was waiting, it sends you back. A short cool-down then avoids frantic back-and-forth.
 
-**Supported environment (v0.1):** Ubuntu 24.04, GNOME on **X11** (not Wayland). Esc-based in-game pause (not process freeze).
+**Supported environment (early / 0.0.x):** Ubuntu 24.04, GNOME on **X11** (not Wayland). Esc-based pause (not process freeze).
 
 ## Requirements
 
@@ -30,10 +30,12 @@ Use the venv binary by absolute path in shortcuts and hooks (GNOME/Cursor often 
 echo "$HOME/src/playwait/.venv/bin/playwait"
 ```
 
+For a guided setup in Cursor, run the **playwait-setup** skill (see `.cursor/skills/playwait-setup/`).
+
 ## Daily use
 
-1. Run the game in **borderless windowed** mode if using Proton.
-2. Focus the game and **arm** it (see hotkeys below):
+1. Prefer **borderless windowed** (or a normal window) over exclusive fullscreen so minimize/focus works reliably.
+2. Focus the game (or other task) window and **arm** it (see hotkeys below):
 
    ```bash
    "$HOME/src/playwait/.venv/bin/playwait" arm
@@ -41,7 +43,7 @@ echo "$HOME/src/playwait/.venv/bin/playwait"
 
    Confirm with `playwait status` — you want `"mode": "armed"` and a non-null `"window_id"`.
 3. When an agent finishes: soft chime → pause → minimize → Cursor. Extra finished chats while you’re already interrupted stay tracked; you are not yanked again.
-4. Reply in Cursor. After each send, if other chats still need you, you stay in Cursor. When the **last** waiting chat is answered, playwait returns you to the game and starts a cool-down that scales with how much thought your replies took (**30s–3 min**, local heuristics — short “yes” → short cool-down; longer/code-heavy replies → longer).
+4. Reply in Cursor. After each send, if other chats still need you, you stay in Cursor. When the **last** waiting chat is answered, playwait returns you to the window and starts a cool-down that scales with how much thought your replies took (**30s–3 min**, local heuristics — short “yes” → short cool-down; longer/code-heavy replies → longer).
 5. When done for the night:
 
    ```bash
@@ -77,7 +79,7 @@ Create or edit `~/.cursor/hooks.json` with **absolute** paths (adjust if your cl
 Replace `/home/YOU/src/playwait` with your real checkout path (e.g. output of `pwd` inside the repo).
 
 - **`stop`** — agent turn ended → interrupt (and remember that chat).
-- **`beforeSubmitPrompt`** — you hit send → clear that chat; return to game only when none remain.
+- **`beforeSubmitPrompt`** — you hit send → clear that chat; return only when none remain.
 
 Dry-run while disarmed:
 
@@ -104,10 +106,10 @@ GNOME may not expand `$HOME` in shortcuts — paste the expanded absolute path i
 ```toml
 pause_key = "Escape"
 resume_key = "Escape"
-# Effort-scaled cool-down after return-to-game (seconds):
+# Effort-scaled cool-down after return (seconds):
 cooldown_min_seconds = 30
 cooldown_max_seconds = 180
-# Fallback when you focus the game manually (no scored reply):
+# Fallback when you focus the window manually (no scored reply):
 cooldown_seconds = 30
 cursor_name = "Cursor"
 cursor_class = "cursor"
@@ -119,15 +121,15 @@ cursor_class = "cursor"
 State and logs: `~/.local/state/playwait/`.
 
 ```bash
-# Live debug (stop/submit, awaiting chats, return-to-game):
+# Live debug (stop/submit, awaiting chats, return):
 tail -f ~/.local/state/playwait/playwait.log
 playwait status   # mode + awaiting_reply snapshot
 ```
 
-## Proton / Skyrim tips
+## Window tips
 
 - Prefer **borderless windowed** over exclusive fullscreen.
-- Pause uses **Esc** (in-game menu). Process freeze (`SIGSTOP`) is a known Proton approach elsewhere; not in v0.1 yet.
+- Pause defaults to **Esc**. Process freeze (`SIGSTOP`) is not in this early release yet.
 
 ## Development
 
@@ -140,6 +142,6 @@ pytest
 
 MIT — see [LICENSE](LICENSE).
 
-## Out of scope (v0.1)
+## Out of scope (0.0.x)
 
 Mid-run Allow/Deny detection, Wayland, SIGSTOP pause mode, non-Cursor agents.

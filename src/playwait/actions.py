@@ -117,7 +117,7 @@ class X11Desktop:
         if not shutil.which("xdotool"):
             log.warning("xdotool not found; cannot send key")
             return False
-        # Focus then key — Proton often needs the window active first.
+        # Focus then key — some games need the window active first.
         _run(["xdotool", "windowactivate", "--sync", window_id])
         proc = _run(["xdotool", "key", "--window", window_id, key])
         ok = bool(proc and proc.returncode == 0)
