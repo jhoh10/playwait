@@ -17,28 +17,39 @@ log = logging.getLogger("playwait")
 
 def quiet_confirm(desktop: Desktop, config: Config, title: str, body: str) -> None:
     desktop.notify(title, body)
-    desktop.play_sound(config.resolve_sound("confirm"))
+    desktop.play_sound(config.resolve_sound("confirm"), wait=False)
 
 
 def interrupt_notify(desktop: Desktop, config: Config, body: str) -> None:
     desktop.notify("playwait", body)
-    desktop.play_sound(config.resolve_sound("interrupt"))
+    desktop.play_sound(config.resolve_sound("interrupt"), wait=False)
 
 
 def do_interrupt(desktop: Desktop, config: Config, state: State) -> State:
-    """Pause game, minimize, raise Cursor, sound, spawn resume watcher."""
+    """Chime, then staged pause → minimize → raise Cursor (less abrupt)."""
     if not state.window_id:
         log.warning("interrupt skipped: no armed window")
         return state
 
     wid = state.window_id
+    # Lead with peaceful chime + notify while still in the game.
+    interrupt_notify(desktop, config, "Agent ready — easing back to Cursor")
+    if config.interrupt_lead_seconds > 0:
+        time.sleep(config.interrupt_lead_seconds)
+
     if desktop.send_key(wid, config.pause_key):
         state.paused = True
     else:
         log.warning("pause key failed; continuing with minimize")
         state.paused = False
 
+    if config.interrupt_step_seconds > 0:
+        time.sleep(config.interrupt_step_seconds)
+
     desktop.minimize(wid)
+    # Give the compositor a beat for its minimize animation.
+    if config.interrupt_step_seconds > 0:
+        time.sleep(config.interrupt_step_seconds)
 
     cursor = desktop.find_cursor_window(config.cursor_name, config.cursor_class)
     if cursor:
@@ -46,7 +57,6 @@ def do_interrupt(desktop: Desktop, config: Config, state: State) -> State:
     else:
         log.warning("Cursor window not found")
 
-    interrupt_notify(desktop, config, "Agent ready — game paused")
     state.mode = Mode.INTERRUPTED
     state.pending = False
     pid = _spawn_self(["resume-watch"])
@@ -151,15 +161,17 @@ def handle_submit(
 
 
 def return_to_game(desktop: Desktop, config: Config, state: State) -> State:
-    """Raise the armed game so resume-watch (or we) can unpause and start cool-down."""
+    """Raise the armed game with a short soft lead-in."""
     if not state.window_id or state.mode != Mode.INTERRUPTED:
         return state
 
+    quiet_confirm(desktop, config, "playwait", "Back to game — all chats answered")
+    if config.return_lead_seconds > 0:
+        time.sleep(config.return_lead_seconds)
+
     desktop.activate(state.window_id)
     # Apply resume + cool-down immediately so we do not depend on polling focus.
-    state = on_resume_focus(desktop, config, state)
-    quiet_confirm(desktop, config, "playwait", "Back to game — all chats answered")
-    return state
+    return on_resume_focus(desktop, config, state)
 
 
 def on_resume_focus(desktop: Desktop, config: Config, state: State) -> State:

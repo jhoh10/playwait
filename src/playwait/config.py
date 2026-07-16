@@ -26,6 +26,10 @@ class Config:
     cursor_name: str = "Cursor"
     cursor_class: str = "cursor"
     poll_interval_seconds: float = 0.4
+    # Soften yank-to-Cursor: chime first, then staged pause → minimize → focus.
+    interrupt_lead_seconds: float = 0.55
+    interrupt_step_seconds: float = 0.4
+    return_lead_seconds: float = 0.35
     interrupt_sound: str = ""
     confirm_sound: str = ""
     state_dir: Path = field(default_factory=lambda: _xdg_state_home() / "playwait")
@@ -93,6 +97,13 @@ def load_config(path: Path | None = None) -> Config:
         data["poll_interval_seconds"], (int, float)
     ):
         cfg.poll_interval_seconds = float(data["poll_interval_seconds"])
+    for delay_key in (
+        "interrupt_lead_seconds",
+        "interrupt_step_seconds",
+        "return_lead_seconds",
+    ):
+        if delay_key in data and isinstance(data[delay_key], (int, float)):
+            setattr(cfg, delay_key, max(0.0, float(data[delay_key])))
     if "state_dir" in data and isinstance(data["state_dir"], str):
         cfg.state_dir = Path(data["state_dir"]).expanduser()
     return cfg

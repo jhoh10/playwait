@@ -18,7 +18,7 @@ class Desktop(Protocol):
     def activate(self, window_id: str) -> bool: ...
     def find_cursor_window(self, name: str, wm_class: str) -> str | None: ...
     def notify(self, title: str, body: str) -> None: ...
-    def play_sound(self, path: Path | None) -> None: ...
+    def play_sound(self, path: Path | None, *, wait: bool = False) -> None: ...
 
 
 @dataclass
@@ -70,7 +70,7 @@ class RecordingDesktop:
     def notify(self, title: str, body: str) -> None:
         self.notifications.append((title, body))
 
-    def play_sound(self, path: Path | None) -> None:
+    def play_sound(self, path: Path | None, *, wait: bool = False) -> None:
         self.sounds.append(str(path) if path else "")
 
 
@@ -187,14 +187,29 @@ class X11Desktop:
             return
         _run(["notify-send", "--app-name=playwait", title, body])
 
-    def play_sound(self, path: Path | None) -> None:
+    def play_sound(self, path: Path | None, *, wait: bool = False) -> None:
         if path is None or not path.is_file():
             return
         for player in ("pw-play", "paplay", "aplay"):
-            if shutil.which(player):
-                proc = _run([player, str(path)], timeout=10.0)
-                if proc and proc.returncode == 0:
+            if not shutil.which(player):
+                continue
+            try:
+                if wait:
+                    proc = _run([player, str(path)], timeout=10.0)
+                    if proc and proc.returncode == 0:
+                        return
+                else:
+                    # Fire-and-forget so window staging can overlap the chime.
+                    subprocess.Popen(  # noqa: S603
+                        [player, str(path)],
+                        stdin=subprocess.DEVNULL,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        start_new_session=True,
+                    )
                     return
+            except OSError as exc:
+                log.warning("sound player %s failed: %s", player, exc)
         log.warning("could not play sound %s", path)
 
 

@@ -130,6 +130,11 @@ resume_key = "Escape"
 cooldown_seconds = 120
 cursor_name = "Cursor"
 cursor_class = "cursor"
+# Soften yank-to-Cursor (seconds). True cross-fade isn't available on X11;
+# staging + GNOME's own minimize animation is the gentle path.
+# interrupt_lead_seconds = 0.55
+# interrupt_step_seconds = 0.4
+# return_lead_seconds = 0.35
 # interrupt_sound = "/path/to/soft.wav"
 # confirm_sound = "/path/to/soft.wav"
 ```

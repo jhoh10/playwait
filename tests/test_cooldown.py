@@ -15,7 +15,13 @@ from playwait.state import Mode, State
 
 
 def _cfg(tmp_path: Path) -> Config:
-    return Config(state_dir=tmp_path, cooldown_seconds=120)
+    return Config(
+        state_dir=tmp_path,
+        cooldown_seconds=120,
+        interrupt_lead_seconds=0.0,
+        interrupt_step_seconds=0.0,
+        return_lead_seconds=0.0,
+    )
 
 
 def test_on_stop_disarmed_noop(tmp_path: Path) -> None:
