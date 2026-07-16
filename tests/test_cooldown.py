@@ -26,6 +26,22 @@ def _cfg(tmp_path: Path) -> Config:
     )
 
 
+def test_stop_while_in_cursor_does_not_raise_game(tmp_path: Path, monkeypatch) -> None:
+    """Manual Cursor focus during armed/cool-down must not flash the game."""
+    desktop = RecordingDesktop(active_id="0x200")  # already in Cursor
+    monkeypatch.setattr("playwait.service._spawn_self", lambda args: 7)
+    state = State(mode=Mode.ARMED, window_id="0xgame")
+    state = handle_stop(
+        desktop, _cfg(tmp_path), state, conversation_id="chat-z"
+    )
+    assert state.mode == Mode.INTERRUPTED
+    assert state.awaiting_reply == ["chat-z"]
+    # Soft path: Esc without activating the game, then Cursor stays put.
+    assert "0xgame" not in desktop.activated
+    assert desktop.keys_sent == [("0xgame", "Escape")]
+    assert desktop.minimized == ["0xgame"]
+
+
 def test_on_stop_disarmed_noop(tmp_path: Path) -> None:
     desktop = RecordingDesktop()
     state = handle_stop(desktop, _cfg(tmp_path), State())

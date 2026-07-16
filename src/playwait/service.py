@@ -212,7 +212,8 @@ def handle_stop(
         return state
 
     log.info("stop: interrupting → Cursor; awaiting=%s", state.awaiting_reply)
-    return do_interrupt(desktop, config, state)
+    # Never raise the game if the user is already in Cursor (avoids game↔Cursor flicker).
+    return _interrupt_respecting_focus(desktop, config, state)
 
 
 def handle_submit(
@@ -337,10 +338,7 @@ def handle_permission(
 
     # Full yank unless focus is already on a Cursor window (not merely
     # "active != armed id" — Proton games often focus a child window).
-    active = desktop.active_window_id()
-    cursor_ids = set(desktop.cursor_window_ids(config.cursor_name, config.cursor_class))
-    already_in_cursor = bool(active and active in cursor_ids)
-    if already_in_cursor:
+    if _cursor_has_focus(desktop, config):
         state = soft_interrupt_already_away(
             desktop,
             config,
@@ -484,17 +482,21 @@ def on_cooldown_left_game(
     config: Config,
     state: State,
 ) -> State:
-    """User left the game during cool-down (e.g. back to Cursor)."""
+    """User left the game during cool-down (e.g. back to Cursor).
+
+    Do not raise the game. If a deferred stop is pending, enter interrupted
+    quietly without a focus dance so the user can keep working in Cursor.
+    """
     if state.mode != Mode.COOLDOWN:
         return state
     state.cooldown_wait_pid = None
     state.cooldown_until = None
     if state.pending and state.window_id:
-        log.info("cool-down abandoned with pending → soft interrupt")
+        log.info("cool-down abandoned with pending → soft interrupt (stay put)")
         return soft_interrupt_already_away(desktop, config, state)
     state.mode = Mode.ARMED
     state.pending = False
-    log.info("cool-down abandoned; armed (left game early)")
+    log.info("cool-down abandoned; armed (left game early, no focus change)")
     return state
 
 
@@ -510,13 +512,19 @@ def on_cooldown_expiry(desktop: Desktop, config: Config, state: State) -> State:
     return state
 
 
+def _cursor_has_focus(desktop: Desktop, config: Config) -> bool:
+    active = desktop.active_window_id()
+    if not active:
+        return False
+    return active in set(desktop.cursor_window_ids(config.cursor_name, config.cursor_class))
+
+
 def _interrupt_respecting_focus(
     desktop: Desktop, config: Config, state: State
 ) -> State:
     """Full yank unless the user is already focused on Cursor."""
-    active = desktop.active_window_id()
-    cursor_ids = set(desktop.cursor_window_ids(config.cursor_name, config.cursor_class))
-    if active and active in cursor_ids:
+    if _cursor_has_focus(desktop, config):
+        log.info("interrupt: Cursor already focused → soft path")
         return soft_interrupt_already_away(desktop, config, state)
     return do_interrupt(desktop, config, state)
 

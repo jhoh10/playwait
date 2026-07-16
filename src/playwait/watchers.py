@@ -19,23 +19,34 @@ log = logging.getLogger("playwait")
 
 
 def run_resume_watch(desktop: Desktop, config: Config) -> int:
-    """Poll until armed window is focused, then resume (+ cool-down unless skipped)."""
+    """Poll until armed window is focused, then resume (+ cool-down unless skipped).
+
+    Require stable game focus briefly so a momentary activate-for-Esc does not
+    count as the user returning to the game.
+    """
     setup_logging(config)
     deadline = time.time() + 24 * 3600  # safety cap
+    focused_since: float | None = None
+    settle = max(0.5, float(config.poll_interval_seconds))
     while time.time() < deadline:
         state = load(config)
         if state.mode != Mode.INTERRUPTED or not state.window_id:
             return 0
         active = desktop.active_window_id()
         if active and active == state.window_id:
-            state = on_resume_focus(desktop, config, state)
-            persist(config, state)
-            log.info(
-                "resumed; mode=%s cool-down_until=%s",
-                state.mode.value,
-                state.cooldown_until,
-            )
-            return 0
+            if focused_since is None:
+                focused_since = time.time()
+            elif time.time() - focused_since >= settle:
+                state = on_resume_focus(desktop, config, state)
+                persist(config, state)
+                log.info(
+                    "resumed; mode=%s cool-down_until=%s",
+                    state.mode.value,
+                    state.cooldown_until,
+                )
+                return 0
+        else:
+            focused_since = None
         time.sleep(config.poll_interval_seconds)
     log.warning("resume-watch timed out")
     return 1
