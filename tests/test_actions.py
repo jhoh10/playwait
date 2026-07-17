@@ -21,9 +21,21 @@ def test_notify_argv_is_transient_and_replacing() -> None:
     assert argv[0] == "notify-send"
     assert "--transient" in argv
     assert "--urgency=low" in argv
+    assert "--hint=int:transient:1" in argv
     assert any(a.startswith("--replace-id=") for a in argv)
     assert any(a.startswith("--expire-time=") for a in argv)
     assert argv[-2:] == ["playwait", "hello"]
+    assert "-p" not in argv
+    assert "-p" in notify_argv("playwait", "hello", print_id=True)
+
+
+def test_close_notification_argv() -> None:
+    from playwait.actions import close_notification_argv
+
+    argv = close_notification_argv(42)
+    assert argv[0] == "gdbus"
+    assert any("CloseNotification" in a for a in argv)
+    assert "uint32:42" in argv
 
 
 def test_recording_desktop_minimize_activate() -> None:

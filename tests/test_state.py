@@ -12,7 +12,7 @@ def test_arm_stores_window(tmp_path: Path) -> None:
     from playwait.service import arm
 
     desktop = RecordingDesktop(active_id="0xabc")
-    cfg = Config(state_dir=tmp_path)
+    cfg = Config(state_dir=tmp_path, desktop_notifications=True)
     state = arm(desktop, cfg, State())
     assert state.mode == Mode.ARMED
     assert state.window_id == "0xabc"
@@ -40,7 +40,7 @@ def test_disarm_clears_pending(tmp_path: Path) -> None:
     from playwait.service import disarm
 
     desktop = RecordingDesktop()
-    cfg = Config(state_dir=tmp_path)
+    cfg = Config(state_dir=tmp_path, desktop_notifications=True)
     prior = State(
         mode=Mode.COOLDOWN,
         window_id="0x1",
