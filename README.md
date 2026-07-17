@@ -1,6 +1,7 @@
 # playwait
 
-While you focus on a game (or another fullscreen task), **Cursor agents** run in the background. When a turn finishes (or a tool needs approval), playwait pauses the window, focuses Cursor, and chimes. After you answer every waiting chat, it sends you back.
+While you focus on a game (or another fullscreen task), **Cursor agents** run in the background. When a turn finishes (or a tool needs approval), playwait pauses the window, focuses Cursor, and chimes. After you answer every waiting chat, it sends you back. There is a cooldown time that gives time before being pulled off of your primary focus, scales depending on the size of your last contribution (default between 1-4 min)
+
 
 **Supported:** Ubuntu 24.04, GNOME on **X11** (not Wayland). Esc pause (not process freeze).
 
@@ -43,7 +44,7 @@ Then: focus your game → `playwait arm` (or your hotkey) → play. When done: `
 
    Confirm with `playwait status` — you want `"mode": "armed"` and a non-null `"window_id"`.
 3. When an agent finishes: soft chime → pause → minimize → Cursor. Extra finished chats while you’re already interrupted stay tracked; you are not yanked again. Mid-run **tool approvals** (MCP always; Shell when the command matches risk patterns) also yank immediately — they **bypass** cool-down. After you Allow, playwait **stays in Cursor** so a burst of approvals (or the imminent turn-end) does not bounce you back to the game.
-4. Reply in Cursor. After each send, if other chats still need you, you stay in Cursor. When the **last fresh** waiting chat is answered, playwait returns you to the window and starts a cool-down that scales with reply effort (**30s–3 min** by default). Waiting chats with **no activity for 15 minutes** are dropped automatically. If you leave the game for Cursor during cool-down, cool-down is abandoned (and a deferred agent-ready interrupt, if any, soft-fires without stealing focus back through the game).
+4. Reply in Cursor. After each send, if other chats still need you, you stay in Cursor. When the **last fresh** waiting chat is answered, playwait returns you to the window and starts a cool-down that scales with reply effort (**1–4 min** by default). Waiting chats with **no activity for 15 minutes** are dropped automatically. If you leave the game for Cursor during cool-down, cool-down is abandoned (and a deferred agent-ready interrupt, if any, soft-fires without stealing focus back through the game).
 5. Done with Cursor but won’t reply to a waiting chat? Clear and return:
 
    ```bash
@@ -139,17 +140,17 @@ GNOME may not expand `$HOME` in shortcuts — paste the expanded absolute path i
 ```toml
 pause_key = "Escape"
 resume_key = "Escape"
-# Effort-scaled cool-down after return (seconds):
-cooldown_min_seconds = 30
-cooldown_max_seconds = 180
+# Effort-scaled cool-down after return (seconds). Default Play range: 1–4 min.
+cooldown_min_seconds = 60
+cooldown_max_seconds = 240
 # Fallback when you focus the window manually (no scored reply):
-cooldown_seconds = 30
+cooldown_seconds = 60
 # Drop waiting chats with no stop/submit activity this long (seconds):
 awaiting_ttl_seconds = 900   # 15 minutes
-# For faster iteration while developing, you can temporarily use:
-# cooldown_min_seconds = 15
-# cooldown_max_seconds = 60
-# cooldown_seconds = 15
+# Debug-only flat cool-down while developing playwait (not for normal play):
+# cooldown_min_seconds = 20
+# cooldown_max_seconds = 20
+# cooldown_seconds = 20
 # Leave game during cool-down for this long → abandon cool-down:
 # cooldown_abandon_seconds = 1.0
 # Tool-permission auto-interrupt:

@@ -94,8 +94,8 @@ def score_effort(prompt: str) -> float:
 def cooldown_seconds_for_effort(
     score: float,
     *,
-    minimum: int = 30,
-    maximum: int = 180,
+    minimum: int = 60,
+    maximum: int = 240,
 ) -> int:
     """Map effort score to inclusive cool-down seconds."""
     lo = max(1, int(minimum))

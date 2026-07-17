@@ -153,18 +153,26 @@ Ask **one question at a time**, then write `~/.config/playwait/config.toml` (cre
 
 ### 5a — Cool-down range after return-to-game
 
-Ask which preset they want (default / recommend **Play**):
+Ask which they want. **Recommend Play (defaults).** Do **not** recommend Short — that is only for developing playwait itself.
 
-1. **Play** — 30s–180s (default; better when gaming between replies)
-2. **Short (iteration)** — 15s–60s (faster testing while developing)
-3. **Custom** — ask for min and max seconds
+1. **Play (recommended / default)** — 60s–240s (1–4 min; room to actually play between replies)
+2. **Custom** — ask for min and max seconds
+3. **Short (debug only)** — flat **20s** (playwait development / rapid iteration; not for normal gaming)
 
-Map to:
+Map Play / Custom to:
 
 ```toml
 cooldown_min_seconds = <min>
 cooldown_max_seconds = <max>
 cooldown_seconds = <min>
+```
+
+Map Short to:
+
+```toml
+cooldown_min_seconds = 20
+cooldown_max_seconds = 20
+cooldown_seconds = 20
 ```
 
 ### 5b — Multi-chat waiting TTL

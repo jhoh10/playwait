@@ -23,10 +23,11 @@ class Config:
     pause_key: str = "Escape"
     resume_key: str = "Escape"
     # Cool-down scales with reply effort between these bounds (seconds).
-    cooldown_min_seconds: int = 30
-    cooldown_max_seconds: int = 180
+    # Default "Play"
+    cooldown_min_seconds: int = 60
+    cooldown_max_seconds: int = 240
     # Fallback when returning to the game without a scored reply (manual focus).
-    cooldown_seconds: int = 30
+    cooldown_seconds: int = 60
     cursor_name: str = "Cursor"
     cursor_class: str = "cursor"
     poll_interval_seconds: float = 0.4
