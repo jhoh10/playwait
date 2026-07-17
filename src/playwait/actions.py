@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
+import os
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
@@ -29,18 +31,67 @@ class Desktop(Protocol):
     def play_sound(self, path: Path | None, *, wait: bool = False) -> None: ...
 
 
-def notify_argv(title: str, body: str) -> list[str]:
-    """Build notify-send argv: transient, short-lived, single replace slot."""
-    return [
+def notify_argv(title: str, body: str, *, print_id: bool = False) -> list[str]:
+    """Build notify-send argv: transient, short-lived, single replace slot.
+
+    print_id: add -p so stdout is the notification id (for explicit CloseNotification).
+    """
+    argv = [
         "notify-send",
         "--app-name=playwait",
         "--urgency=low",
         "--expire-time=" + _NOTIFY_EXPIRE_MS,
         "--transient",
+        # Older GNOME stacks ignored --transient alone; hint reinforces it.
+        "--hint=int:transient:1",
         "--replace-id=" + _NOTIFY_REPLACE_ID,
-        title,
-        body,
     ]
+    if print_id:
+        argv.insert(1, "-p")
+    argv.extend([title, body])
+    return argv
+
+
+def close_notification_argv(notification_id: int) -> list[str]:
+    """gdbus CloseNotification for a prior notify-send -p id."""
+    return [
+        "gdbus",
+        "call",
+        "--session",
+        "--dest",
+        "org.freedesktop.Notifications",
+        "--object-path",
+        "/org/freedesktop/Notifications",
+        "--method",
+        "org.freedesktop.Notifications.CloseNotification",
+        f"uint32:{int(notification_id)}",
+    ]
+
+
+def schedule_close_notification(notification_id: int, delay_seconds: float) -> None:
+    """Close a banner after delay so it does not linger into logout / GDM."""
+    if notification_id <= 0 or delay_seconds < 0:
+        return
+    if not shutil.which("gdbus"):
+        return
+    delay = max(0.1, float(delay_seconds))
+    # Detached closer: survives the hook process, dies with the user session.
+    closer = (
+        "import time, subprocess\n"
+        f"time.sleep({delay!r})\n"
+        f"cmd={close_notification_argv(notification_id)!r}\n"
+        "subprocess.run(cmd, check=False, capture_output=True, timeout=5)\n"
+    )
+    try:
+        subprocess.Popen(  # noqa: S603 — controlled argv
+            [sys.executable, "-c", closer],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except OSError as exc:
+        log.warning("could not schedule notification close: %s", exc)
 
 
 @dataclass
@@ -335,7 +386,21 @@ class X11Desktop:
     def notify(self, title: str, body: str) -> None:
         if not shutil.which("notify-send"):
             return
-        _run(notify_argv(title, body))
+        # No session bus (logout / greeter / headless) → skip; avoids GDM piles.
+        if not os.environ.get("DBUS_SESSION_BUS_ADDRESS"):
+            log.info("notify: skipped (no DBUS_SESSION_BUS_ADDRESS)")
+            return
+        proc = _run(notify_argv(title, body, print_id=True), timeout=2.0)
+        if not proc or proc.returncode != 0:
+            # Fall back without -p if the platform rejects it.
+            _run(notify_argv(title, body), timeout=2.0)
+            return
+        try:
+            nid = int((proc.stdout or "").strip().splitlines()[-1])
+        except (ValueError, IndexError):
+            return
+        # Expire-time alone is unreliable when GNOME queues banners; close explicitly.
+        schedule_close_notification(nid, float(_NOTIFY_EXPIRE_MS) / 1000.0)
 
     def play_sound(self, path: Path | None, *, wait: bool = False) -> None:
         if path is None or not path.is_file():

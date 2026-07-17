@@ -36,9 +36,9 @@ class Config:
     return_lead_seconds: float = 0.35
     interrupt_sound: str = ""
     confirm_sound: str = ""
-    # Desktop banners are secondary to chimes; GNOME can queue them behind
-    # Cursor's tool-approval notifications until those are dismissed.
-    desktop_notifications: bool = True
+    # Desktop banners are secondary to chimes. Default off: GNOME often queues
+    # them behind Cursor Allow prompts, then flushes a pile onto the login screen.
+    desktop_notifications: bool = False
     # Leave the game during cool-down this long → abandon cool-down (seconds).
     cooldown_abandon_seconds: float = 1.0
     # Drop awaiting chats with no stop/submit activity for this long (seconds).

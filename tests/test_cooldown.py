@@ -24,6 +24,7 @@ def _cfg(tmp_path: Path) -> Config:
         interrupt_lead_seconds=0.0,
         interrupt_step_seconds=0.0,
         return_lead_seconds=0.0,
+        desktop_notifications=True,
     )
 
 
